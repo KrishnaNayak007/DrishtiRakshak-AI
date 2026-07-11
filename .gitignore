@@ -1,0 +1,23 @@
+# --- Python ---
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# --- Django runtime state ---
+db.sqlite3
+media/
+
+# --- Secrets / environment ---
+.env
+
+# --- Runtime model artifacts (downloadable, not source) ---
+# Ignore the specific runtime checkpoint by path. We deliberately do NOT
+# ignore *.pt globally, so intentionally version-controlled model artifacts
+# introduced later remain possible.
+backend/yolov8n.pt
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
