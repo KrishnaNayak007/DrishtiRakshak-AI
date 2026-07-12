@@ -64,46 +64,13 @@
 | Security | Layered: secrets/DEBUG/JWT/upload-val (P1) → tenancy/RBAC (P2) → media/HTTPS/rate-limit (P3) | P1→ |
 | Config | `django-environ`, single settings file, `.env.example` committed | P1 |
 
-## 4. Configuration loading
-
-Implemented in Task 1 (Phase 1) via `django-environ` in
-`backend/drishtirakshak/settings.py`. A single settings file reads all
-environment-specific values from the environment — no dev/prod file split.
-
-**Precedence (highest wins):**
-
-1. **Real process environment variables** — what the deployment platform
-   (Render/Railway) injects. These always win.
-2. **`backend/.env`** — a local, gitignored file for development only.
-   `environ.Env.read_env()` only sets keys not already present in the
-   environment, so it never overrides platform variables.
-3. **Coded defaults** in `settings.py` — used only for optional variables.
-
-**Variables:**
-
-| Variable | Required? | Default | Notes |
-|---|---|---|---|
-| `SECRET_KEY` | **Required** | *none* | No fallback. Missing value raises `ImproperlyConfigured` — the app fails fast. Dev supplies it via `.env`; prod via platform env var. |
-| `DEBUG` | Optional | `False` | Secure by default. Set `True` only in local dev. |
-| `ALLOWED_HOSTS` | Optional | `localhost,127.0.0.1` | Comma-separated. Set to real domain(s) in prod. |
-| `CORS_ALLOWED_ORIGINS` | Optional | Vite dev origins | Comma-separated browser origins allowed to call the API. |
-
-**Developer workflow:** `cp backend/.env.example backend/.env`, then set a
-unique `SECRET_KEY` (generator command is in `.env.example`). `.env` is
-gitignored; `.env.example` is committed as the documented template.
-
-**Why required-with-no-fallback for `SECRET_KEY`:** a committed fallback key is
-a credential leak and risks silently shipping a known key to production.
-Failing fast on a missing secret is safer than booting with an insecure
-default. (See ADR-0002 context and `ENGINEERING_BIBLE.md` §8.)
-
-## 5. Explicitly postponed (data-gated, NOT scheduled)
+## 4. Explicitly postponed (data-gated, NOT scheduled)
 
 Learned risk scoring · OCR · model fine-tuning + eval harness · multi-agent
 orchestration · embeddings/semantic search · n8n · Kubernetes · metrics/APM
 dashboards · multi-region · legal chain-of-custody.
 
-## 6. Open note — the `ai/` directory
+## 5. Open note — the `ai/` directory
 
 The project layout reserves a top-level `ai/` directory. The **approved** LLM
 location is `backend/detection/llm/` (keeps the AI engine behind the existing
@@ -112,7 +79,7 @@ becomes a distinct top-level home for models/notebooks/training assets is a
 **Phase 4 decision**, to be recorded in a future ADR rather than pre-scaffolded
 now. It is intentionally not created empty today.
 
-## 7. Directories
+## 6. Directories
 
 - `backend/` — Django monolith (exists).
 - `frontend/` — React + Vite SPA (exists).

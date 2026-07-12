@@ -12,20 +12,42 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+import environ
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Configuration loading (12-factor).
+#   Precedence for every variable below is: real environment variable first,
+#   then a value from a local .env file, then the coded default (if any).
+#   read_env() only sets keys that are NOT already present in the environment,
+#   so a deployment platform's environment variables always win over .env.
+#   See docs/ARCHITECTURE.md ("Configuration loading") for the full contract.
+env = environ.Env(
+    DEBUG=(bool, False),
+    ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
+    CORS_ALLOWED_ORIGINS=(
+        list,
+        ["http://localhost:5173", "http://127.0.0.1:5173"],
+    ),
+)
+environ.Env.read_env(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-*yo1pflv_tc%$89vgx!$db7&oez7_5lnk2^6%c_at+hc69gv^)'
+# Required — no fallback. Development supplies it via a local .env file;
+# production supplies it via a platform-provided environment variable. A
+# missing SECRET_KEY raises ImproperlyConfigured, so the app fails fast.
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Secure by default: DEBUG is False unless explicitly enabled.
+DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
 
 # Application definition
@@ -57,10 +79,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 
 ROOT_URLCONF = 'drishtirakshak.urls'
 
