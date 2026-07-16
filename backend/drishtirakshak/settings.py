@@ -191,3 +191,7 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
 }
+
+# Upload limit (50 MB in bytes)
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024
+
