@@ -3,6 +3,10 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 from organizations.views import OrganizationViewSet
 from vehicles.views import VehicleViewSet
@@ -17,7 +21,11 @@ router.register("incidents", IncidentViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include(router.urls)),
+    # JWT auth (ADR-0002): obtain an access/refresh pair, then refresh the
+    # access token. Refresh rotation + blacklist are configured in settings.
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/v1/', include(router.urls)),
 ]
 
 if settings.DEBUG:

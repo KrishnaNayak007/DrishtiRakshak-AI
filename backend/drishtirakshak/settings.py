@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'organizations',
     'corsheaders',
     'vehicles',
@@ -105,10 +106,10 @@ WSGI_APPLICATION = 'drishtirakshak.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db(
+        'DATABASE_URL',
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    )
 }
 
 
@@ -152,3 +153,41 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# REST framework / authentication
+# https://www.django-rest-framework.org/api-guide/authentication/
+#
+# The API is authenticated by default: every endpoint requires a valid JWT
+# unless a view explicitly opts out. This closes the previous AllowAny gap
+# (any caller could read/upload/download evidence). See ADR-0002.
+#
+# NOTE: this establishes *authentication* (who you are). Per-tenant
+# *authorization* (which org's data you may access) is Phase 2 and is
+# deliberately not implemented here.
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
+
+# SimpleJWT configuration (ADR-0002).
+#   - Short-lived access tokens limit the blast radius of a leaked token.
+#   - Refresh-token rotation issues a new refresh token on each refresh.
+#   - Blacklist-after-rotation invalidates the old refresh token so it can't
+#     be reused (revocation support via the token_blacklist app).
+# Token lifetimes are intentionally kept here in SIMPLE_JWT rather than in
+# environment variables for now — they are policy, not per-environment config.
+from datetime import timedelta  # noqa: E402  (local import keeps the JWT policy self-contained)
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
