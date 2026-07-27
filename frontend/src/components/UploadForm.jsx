@@ -9,9 +9,14 @@ export default function UploadForm({ onDone }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.listVehicles().then((list) => {
-      setVehicles(list);
-      if (list.length > 0) setVehicleId(list[0].id);
+    api.listVehicles().then((res) => {
+      // Defensive check: extract the actual array if the backend is paginated
+      const vehicleArray = Array.isArray(res) ? res : (res?.results || []);
+      
+      setVehicles(vehicleArray);
+      if (vehicleArray.length > 0) {
+        setVehicleId(vehicleArray[0].id);
+      }
     }).catch((e) => setError(e.message));
   }, []);
 

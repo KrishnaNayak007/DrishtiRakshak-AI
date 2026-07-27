@@ -6,6 +6,11 @@ django-environ>=0.11,<1.0
 opencv-python-headless>=4.9
 psycopg2-binary>=2.9
 
+# Logging & Testing Dependencies (Phase 1)
+python-json-logger>=4.0.0
+pytest>=8.0.0
+pytest-django>=4.8.0
+
 numpy>=1.26
 ultralytics>=8.2
 # Install ultralytics when you're ready to run real detection (heavy download, ~200MB+ w/ torch):

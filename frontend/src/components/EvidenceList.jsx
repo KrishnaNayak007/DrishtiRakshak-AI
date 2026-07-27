@@ -12,7 +12,10 @@ function riskLabel(score) {
 }
 
 export default function EvidenceList({ items, selectedId, onSelect }) {
-  if (items.length === 0) {
+  // Safe extraction helper: supports both paginated responses and plain arrays [11]
+  const listToRender = Array.isArray(items) ? items : (items?.results || []);
+
+  if (listToRender.length === 0) {
     return (
       <div className="evidence-list">
         <div className="empty-state">
@@ -26,7 +29,7 @@ export default function EvidenceList({ items, selectedId, onSelect }) {
 
   return (
     <div className="evidence-list">
-      {items.map((item) => {
+      {listToRender.map((item) => {
         const score = item.incident?.risk_score ?? 0;
         return (
           <div

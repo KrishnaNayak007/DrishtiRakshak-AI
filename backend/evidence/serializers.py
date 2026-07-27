@@ -1,13 +1,9 @@
 import os
 from django.conf import settings
 from rest_framework import serializers
-
 from evidence.models import Evidence, TimelineEvent
 from incidents.serializers import IncidentSerializer
-
 ALLOWED_VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.mpeg', '.mpg')
-
-
 class TimelineEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimelineEvent

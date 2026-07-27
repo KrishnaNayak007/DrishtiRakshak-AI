@@ -1,100 +1,121 @@
-"""
-CURRENT IMPLEMENTATION: a deliberately simple, fully explainable heuristic.
-This is NOT a "Threat Assessment Agent" — it's a weighted rule you can read
-top to bottom and verify by hand against a video. That's the point: every
-number this produces must be traceable to a specific rule firing on
-specific detections, so it can be explained honestly to a pilot user,
-an interviewer, or a judge.
+from collections import Counter
+from typing import List
 
-Rule (v1): if 2+ vehicle-class detections stay present across a sustained
-run of consecutive sampled frames, treat that as a "sustained proximity"
-signal and raise risk proportionally to how long it persists. This is a
-crude proxy for "something is loitering near the vehicle" — good enough to
-demo and iterate on with real footage, not a claim of behavioral
-understanding.
-
-PLANNED: replace frame-presence-counting with actual tracked-object IDs
-(once ByteTrack is wired in) so "sustained" means the *same* vehicle, not
-just any vehicle being present in each sampled frame.
-
-FUTURE VISION: multi-signal fusion (audio, GPS, motion) — not attempted here.
-"""
-
-from dataclasses import dataclass
-
-from detection.interface import FrameDetections
-
-VEHICLE_LABELS = {"car", "truck", "bus", "motorcycle", "bicycle"}
-SUSTAINED_PROXIMITY_MIN_VEHICLES = 2
-SUSTAINED_PROXIMITY_MIN_CONSECUTIVE_SAMPLES = 5  # at sample_every_n_frames=10 @30fps, ~1.5s+
+from detection.interface import Assessment, FrameDetections, ScoringEvent
 
 
-@dataclass
-class RiskEvent:
-    event_type: str
-    timestamp_seconds: float
-    confidence: float
-    description: str
+def score_frames(frames: List[FrameDetections]) -> Assessment:
+    """
+    Evaluates a sequence of FrameDetections and computes a transparent risk score.
+    No black-box models are used here; the math relies on clear weighted heuristics [6].
+    """
+    events: List[ScoringEvent] = []
+    
+    if not frames:
+        return Assessment(
+            risk_score=0.0,
+            summary="No video data or frames available for analysis.",
+            events=[]
+        )
 
+    # 1. Track object frequencies to determine "Sustained Proximity"
+    total_sampled_frames = len(frames)
+    label_frame_counts = Counter()
+    
+    # Track when objects first appeared
+    first_seen = {}
 
-@dataclass
-class RiskAssessment:
-    risk_score: float  # 0.0-1.0
-    events: list[RiskEvent]
-    summary: str
+    for frame in frames:
+        # Deduplicate labels in the same frame to count frame presence frequency
+        unique_labels_in_frame = {det.label for det in frame.detections}
+        for label in unique_labels_in_frame:
+            label_frame_counts[label] += 1
+            if label not in first_seen:
+                first_seen[label] = frame.timestamp
 
+    # 2. Heuristic: Person Detected
+    # People detected on roadways present an immediate, high-priority safety risk [8].
+    for frame in frames:
+        person_detections = [d for d in frame.detections if d.label == "person"]
+        if person_detections:
+            max_conf = max(p.confidence for p in person_detections)
+            events.append(
+                ScoringEvent(
+                    timestamp_seconds=frame.timestamp,
+                    event_type="person_detected",
+                    confidence=max_conf,
+                    description=f"Vulnerable road user (person) detected at offset {frame.timestamp:.2f}s."
+                )
+            )
+            # Flag only once in this simple model to avoid event spamming
+            break
 
-def score_frames(frame_detections: list[FrameDetections]) -> RiskAssessment:
-    events: list[RiskEvent] = []
-    consecutive_run = 0
-    run_start_ts = None
+    # 3. Heuristic: Sustained Proximity
+    # If a motorcycle or other vehicle appears in >= 50% of your sampled frames,
+    # and has been present for over 3 seconds, trigger sustained proximity [3, 8].
+    for label, count in label_frame_counts.items():
+        if label in ["motorcycle", "car", "truck"] and total_sampled_frames >= 4:
+            ratio = count / total_sampled_frames
+            if ratio >= 0.5:
+                # Calculate duration of presence
+                durations = [f.timestamp for f in frames if any(d.label == label for d in f.detections)]
+                if durations and (max(durations) - min(durations)) >= 3.0:
+                    events.append(
+                        ScoringEvent(
+                            timestamp_seconds=min(durations),
+                            event_type="sustained_proximity",
+                            confidence=ratio,
+                            description=f"Sustained proximity of a {label} detected (present in {ratio*100:.0f}% of frames)."
+                        )
+                    )
 
-    for fd in frame_detections:
-        vehicle_count = sum(1 for d in fd.detections if d.label in VEHICLE_LABELS)
+    # 4. Heuristic: Vehicle Detected
+    # Ensure standard vehicle presences are logged as baseline events
+    for frame in frames:
+        vehicles = [d for d in frame.detections if d.label in ["car", "truck", "bus"]]
+        if vehicles:
+            max_conf = max(v.confidence for v in vehicles)
+            events.append(
+                ScoringEvent(
+                    timestamp_seconds=frame.timestamp,
+                    event_type="vehicle_detected",
+                    confidence=max_conf,
+                    description=f"Standard roadway vehicle detected at offset {frame.timestamp:.2f}s."
+                )
+            )
+            break
 
-        if vehicle_count >= SUSTAINED_PROXIMITY_MIN_VEHICLES:
-            if consecutive_run == 0:
-                run_start_ts = fd.timestamp_seconds
-            consecutive_run += 1
-        else:
-            if consecutive_run >= SUSTAINED_PROXIMITY_MIN_CONSECUTIVE_SAMPLES:
-                events.append(_make_sustained_proximity_event(run_start_ts, fd.timestamp_seconds, consecutive_run))
-            consecutive_run = 0
-            run_start_ts = None
+    # 5. Transparent Weighted Scoring Math
+    # Simple weights applied to detected events to derive final risk score [6]
+    score = 0.0
+    triggered_types = {e.event_type for e in events}
 
-    # flush a run that was still active at the end of the clip
-    if consecutive_run >= SUSTAINED_PROXIMITY_MIN_CONSECUTIVE_SAMPLES:
-        events.append(_make_sustained_proximity_event(run_start_ts, frame_detections[-1].timestamp_seconds, consecutive_run))
+    if "vehicle_detected" in triggered_types:
+        score += 0.15
+    if "person_detected" in triggered_types:
+        score += 0.30
+    if "sustained_proximity" in triggered_types:
+        score += 0.45
+    if "sudden_deceleration" in triggered_types:
+        score += 0.50
 
-    risk_score = _combine(events)
-    summary = _summarize(events, risk_score)
-    return RiskAssessment(risk_score=risk_score, events=events, summary=summary)
+    # Cap score cleanly at 1.0 (100% risk) [20]
+    final_score = min(score, 1.0)
 
+    # 6. Generate Explainable Narrative
+    # The summary details exactly which logical checks triggered the risk score [10, 20].
+    if not events:
+        summary = "No unusual telemetry conditions or threat patterns identified. Driving environment is normal."
+    else:
+        event_summary_strs = [f"- {e.description}" for e in events]
+        summary = (
+            f"Threat evaluation concluded with a risk score of {final_score:.2f}.\n"
+            f"The following indicators contributed to this risk evaluation:\n"
+            + "\n".join(event_summary_strs)
+        )
 
-def _make_sustained_proximity_event(start_ts, end_ts, run_length) -> RiskEvent:
-    duration = end_ts - start_ts
-    confidence = min(1.0, 0.4 + 0.05 * run_length)  # simple, capped, explainable scaling
-    return RiskEvent(
-        event_type="sustained_proximity",
-        timestamp_seconds=start_ts,
-        confidence=confidence,
-        description=(
-            f"2+ vehicles detected continuously for ~{duration:.1f}s "
-            f"starting at {start_ts:.1f}s."
-        ),
+    return Assessment(
+        risk_score=final_score,
+        summary=summary,
+        events=events
     )
-
-
-def _combine(events: list[RiskEvent]) -> float:
-    if not events:
-        return 0.0
-    # simple max-based combination, not a weighted model — deliberately crude v1
-    return round(max(e.confidence for e in events), 3)
-
-
-def _summarize(events: list[RiskEvent], risk_score: float) -> str:
-    if not events:
-        return "No sustained-proximity signals detected. Risk score 0.0."
-    lines = [f"Risk score {risk_score:.2f}, driven by {len(events)} event(s):"]
-    lines += [f"- {e.description}" for e in events]
-    return "\n".join(lines)

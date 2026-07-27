@@ -2,6 +2,7 @@ import hashlib
 import uuid
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from vehicles.models import Vehicle
 
@@ -28,6 +29,12 @@ class Evidence(models.Model):
       (requires actual legal review before ever being claimed as such)
     """
 
+    class ProcessingStatus(models.TextChoices):
+        PENDING = 'PENDING', _('Pending')
+        PROCESSING = 'PROCESSING', _('Processing')
+        COMPLETED = 'COMPLETED', _('Completed')
+        FAILED = 'FAILED', _('Failed')
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="evidence_items")
     video_file = models.FileField(upload_to=evidence_upload_path)
@@ -36,6 +43,15 @@ class Evidence(models.Model):
     locked = models.BooleanField(default=False)
     locked_at = models.DateTimeField(null=True, blank=True)
     processed = models.BooleanField(default=False)
+
+    # Added fields for Async Processing Status Tracking
+    processing_status = models.CharField(
+        max_length=20,
+        choices=ProcessingStatus.choices,
+        default=ProcessingStatus.PENDING
+    )
+    task_id = models.CharField(max_length=255, null=True, blank=True)
+    error_message = models.TextField(null=True, blank=True)
 
     def __str__(self) -> str:
         return f"Evidence {self.id} ({self.vehicle})"

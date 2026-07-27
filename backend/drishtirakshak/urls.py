@@ -8,13 +8,14 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from organizations.views import OrganizationViewSet
+from organizations.views import OrganizationViewSet, OrganizationMembershipViewSet
 from vehicles.views import VehicleViewSet
 from evidence.views import EvidenceViewSet
 from incidents.views import IncidentViewSet
 
 router = DefaultRouter()
 router.register("organizations", OrganizationViewSet)
+router.register("memberships", OrganizationMembershipViewSet)
 router.register("vehicles", VehicleViewSet)
 router.register("evidence", EvidenceViewSet)
 router.register("incidents", IncidentViewSet)
