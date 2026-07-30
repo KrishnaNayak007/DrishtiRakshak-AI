@@ -9,13 +9,18 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies
+# Copy requirements file first
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# 1. Install CPU-only PyTorch and Torchvision (with timeout extensions)
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 5 torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install remaining python dependencies (with timeout extensions)
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 5 -r requirements.txt
 
 # Copy project files
 COPY . .

@@ -1,3 +1,4 @@
+# backend/evidence/models.py
 import hashlib
 import uuid
 
@@ -37,7 +38,8 @@ class Evidence(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="evidence_items")
-    video_file = models.FileField(upload_to=evidence_upload_path)
+    # Added max_length=500 to support long UUID directory structures
+    video_file = models.FileField(upload_to=evidence_upload_path, max_length=500)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     sha256_hash = models.CharField(max_length=64, blank=True)
     locked = models.BooleanField(default=False)

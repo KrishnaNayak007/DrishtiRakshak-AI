@@ -1,4 +1,9 @@
+# backend/detection/llm/fallback_provider.py
+import hashlib
+import logging
 from .base import BaseLLMProvider
+
+logger = logging.getLogger(__name__)
 
 class RuleBasedFallbackProvider(BaseLLMProvider):
     """
@@ -33,3 +38,22 @@ class RuleBasedFallbackProvider(BaseLLMProvider):
             f"timeline. The explainable heuristic threat assessment sits at {risk_score:.2f} / 1.00, "
             f"indicating {threat_context}."
         )
+
+    def generate_embedding(self, text: str, dimension: int = 384) -> list[float]:
+        """
+        Generates a deterministic vector representation of text for offline/fallback use.
+        Ensures that Qdrant indexing does not crash if there is no internet or active API key.
+        """
+        logger.info(f"Generating deterministic local fallback embedding of dimension {dimension}")
+        hasher = hashlib.sha256(text.encode("utf-8"))
+        hash_bytes = hasher.digest()
+        
+        # Repeat and scale bytes to fill the target vector dimensions
+        vector = []
+        for i in range(dimension):
+            byte_val = hash_bytes[i % len(hash_bytes)]
+            # Normalize to a float range between -1.0 and 1.0
+            normalized = (byte_val / 127.5) - 1.0
+            vector.append(normalized)
+            
+        return vector

@@ -13,5 +13,11 @@ pytest-django>=4.8.0
 
 numpy>=1.26
 ultralytics>=8.2
-# Install ultralytics when you're ready to run real detection (heavy download, ~200MB+ w/ torch):
-# ultralytics>=8.2
+
+# Background Worker & Message Queue Broker Integration
+celery>=5.3.0
+redis>=5.0.0
+
+# AI & Vector Storage Integrations
+google-genai>=0.1.0
+qdrant-client>=1.9.0

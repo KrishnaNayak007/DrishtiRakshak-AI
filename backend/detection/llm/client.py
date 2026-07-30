@@ -1,3 +1,4 @@
+# backend/detection/llm/client.py
 import logging
 from .gemini_provider import GeminiProvider
 from .fallback_provider import RuleBasedFallbackProvider
@@ -23,3 +24,18 @@ class LLMClient:
         except Exception as e:
             logger.warning(f"Primary Gemini generation failed ({e}). Dropping back to rule-based fallback.")
             return self.fallback.generate_summary(timeline_events, risk_score)
+
+    def generate_embedding(self, text: str, dimension: int = 768) -> list[float]:
+        """
+        Generates semantic vector embeddings. Falls back to local deterministic 
+        hashing if the API key is absent or a network call fails.
+        """
+        if not self.primary.api_key:
+            logger.info("GEMINI_API_KEY not found in environment. Defaulting to local fallback embedding.")
+            return self.fallback.generate_embedding(text, dimension=dimension)
+
+        try:
+            return self.primary.generate_embedding(text, dimension=dimension)
+        except Exception as e:
+            logger.warning(f"Primary Gemini embedding generation failed ({e}). Falling back to local deterministic embedding.")
+            return self.fallback.generate_embedding(text, dimension=dimension)

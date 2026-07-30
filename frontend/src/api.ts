@@ -1,7 +1,13 @@
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE: string = "/api";
 
-// Local storage abstractions for JWT credentials
-export const tokenStorage = {
+export interface TokenStorage {
+  getAccess: () => string | null;
+  getRefresh: () => string | null;
+  set: (access: string, refresh?: string) => void;
+  clear: () => void;
+}
+
+export const tokenStorage: TokenStorage = {
   getAccess: () => localStorage.getItem("dr_access"),
   getRefresh: () => localStorage.getItem("dr_refresh"),
   set: (access, refresh) => {
@@ -14,27 +20,24 @@ export const tokenStorage = {
   },
 };
 
-// In-flight refresh promise to prevent concurrent request race conditions
-let refreshPromise = null;
+let refreshPromise: Promise<any> | null = null;
 
-async function request(path, options = {}) {
-  const headers = { ...options.headers };
+async function request(path: string, options: RequestInit = {}): Promise<any> {
+  const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   
-  // Attach the authorization header unless requesting token operations
   const token = tokenStorage.getAccess();
   if (token && !path.startsWith("/token/")) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Handle object-to-JSON formatting automatically
-  if (options.body && !(options.body instanceof FormData) && typeof options.body === "object") {
+  let body = options.body;
+  if (body && !(body instanceof FormData) && typeof body === "object") {
     headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(options.body);
+    body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, body });
 
-  // Handle Token Expiration (401 Unauthorized)
   if (res.status === 401 && !path.startsWith("/token/")) {
     const refresh = tokenStorage.getRefresh();
     if (!refresh) {
@@ -44,7 +47,6 @@ async function request(path, options = {}) {
     }
 
     try {
-      // Deduplicate overlapping refresh requests
       if (!refreshPromise) {
         refreshPromise = fetch(`${API_BASE}/token/refresh/`, {
           method: "POST",
@@ -59,15 +61,13 @@ async function request(path, options = {}) {
       const tokens = await refreshPromise;
       refreshPromise = null;
 
-      // Persist the newly rotated access token
       tokenStorage.set(tokens.access, tokens.refresh);
 
-      // Re-attempt original request with the fresh Access Token
       headers["Authorization"] = `Bearer ${tokens.access}`;
-      const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers });
+      const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers, body });
       if (!retryRes.ok) {
-        const body = await retryRes.text();
-        throw new Error(`${retryRes.status} ${retryRes.statusText}: ${body}`);
+        const errBody = await retryRes.text();
+        throw new Error(`${retryRes.status} ${retryRes.statusText}: ${errBody}`);
       }
       return retryRes.status === 204 ? null : retryRes.json();
     } catch (err) {
@@ -79,36 +79,37 @@ async function request(path, options = {}) {
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+    const errBody = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${errBody}`);
   }
   return res.status === 204 ? null : res.json();
 }
 
 export const api = {
-  // Authentication Actions
-  login: async (username, password) => {
+  login: async (username: string, password: string): Promise<any> => {
     const data = await request("/token/", {
       method: "POST",
-      body: { username, password },
+      body: { username, password } as any,
     });
     tokenStorage.set(data.access, data.refresh);
     return data;
   },
-  logout: () => {
+  logout: (): void => {
     tokenStorage.clear();
     window.dispatchEvent(new Event("auth_logout"));
   },
-
-  // Operational APIs mapping to backend versioned URLs
-  listEvidence: () => request("/v1/evidence/"),
-  getEvidence: (id) => request(`/v1/evidence/${id}/`),
-  processEvidence: (id) => request(`/v1/evidence/${id}/process/`, { method: "POST" }),
-  uploadEvidence: (vehicleId, file) => {
+  listEvidence: (): Promise<any[]> => request("/v1/evidence/"),
+  getEvidence: (id: string): Promise<any> => request(`/v1/evidence/${id}/`),
+  processEvidence: (id: string): Promise<any> => request(`/v1/evidence/${id}/process/`, { method: "POST" }),
+  uploadEvidence: (vehicleId: string, file: File): Promise<any> => {
     const form = new FormData();
     form.append("vehicle", vehicleId);
     form.append("video_file", file);
     return request("/v1/evidence/", { method: "POST", body: form });
   },
-  listVehicles: () => request("/v1/vehicles/"),
+  listVehicles: (): Promise<any[]> => request("/v1/vehicles/"),
+  searchEvidence: (query: string): Promise<any[]> => request("/v1/evidence/search/", {
+    method: "POST",
+    body: { query } as any
+  }),
 };

@@ -1,17 +1,6 @@
-"""
-CURRENT IMPLEMENTATION: the glue between the model-agnostic detection/risk
-modules and the Django ORM. This is intentionally the *only* place that
-imports both `evidence`/`incidents` models and the detection layer — keeps
-the detection package testable in isolation (no DB required to unit test
-risk.py's math).
-
-INTEGRATED PHASE 3 updates:
-- Runs async inside Celery worker.
-- Generates dynamic summaries using LLMClient (with fallback).
-- Embeds and indexes incident summaries inside Qdrant with tenant-safety payloads.
-"""
 import logging
 import hashlib
+import os
 from typing import List
 
 from evidence.models import Evidence, TimelineEvent
@@ -26,11 +15,13 @@ from detection.vector_store import QdrantVectorStore
 
 logger = logging.getLogger(__name__)
 
+# Pull configured sample rate from environment variables, defaulting safely to 15 (2 FPS)
+SAMPLE_RATE = int(os.environ.get("CV_SAMPLE_RATE", 15))
+
 
 def generate_local_fallback_embedding(text: str, dimension: int = 384) -> List[float]:
     """
     Generates a deterministic vector representation of text for offline/fallback use.
-    Ensures that Qdrant indexing does not crash if there is no internet or active API key.
     """
     hasher = hashlib.sha256(text.encode("utf-8"))
     hash_bytes = hasher.digest()
@@ -48,13 +39,10 @@ def generate_local_fallback_embedding(text: str, dimension: int = 384) -> List[f
 
 def process_evidence(evidence: Evidence) -> Incident:
     """
-    Runs detection + heuristic risk scoring on an Evidence video,
-    generates a dynamic AI summary, indexes the incident inside Qdrant,
-    and persists the results as TimelineEvents + one Incident.
-    Locks the evidence afterward to preserve tamper-evidence logic.
+    Runs detection + heuristic risk scoring on an Evidence video.
     """
-    # 1. Run core CV inference and rule-based mathematical scoring
-    frame_detections = detect_video(evidence.video_file.path)
+    # 1. Run core CV inference with temporal decimation
+    frame_detections = detect_video(evidence.video_file.path, sample_every_n_frames=SAMPLE_RATE)
     assessment = score_frames(frame_detections)
 
     # 2. Persist high-frequency Timeline Events
@@ -97,7 +85,6 @@ def process_evidence(evidence: Evidence) -> Incident:
     )
 
     # 5. Index the incident inside our Qdrant Semantic Memory database
-    # Enforces strict isolation boundaries by extracting the organization ID
     organization_id = str(evidence.vehicle.organization.id)
     
     logger.info(f"Indexing incident vectors in Qdrant for Tenant organization {organization_id}")
@@ -106,8 +93,8 @@ def process_evidence(evidence: Evidence) -> Incident:
     # Initialize collection if not already active
     qdrant_store.init_collection()
 
-    # Generate vector (using fallback layout for local verification)
-    vector = generate_local_fallback_embedding(
+    # Generate semantic embedding matching Qdrant schema vector dimension rules.
+    vector = llm_client.generate_embedding(
         text=generated_summary,
         dimension=qdrant_store.VECTOR_DIMENSION
     )

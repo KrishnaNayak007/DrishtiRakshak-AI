@@ -1,9 +1,7 @@
-import logging
 import os
-from typing import List, Dict, Any, Optional
+import logging
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from qdrant_client.http.exceptions import UnexpectedResponse
 
 logger = logging.getLogger(__name__)
 
@@ -15,14 +13,13 @@ QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)
 class QdrantVectorStore:
     """
     Manager class handling communication with the Qdrant vector database.
-    Establishes schemas and runs multi-tenant filtered vector queries.
+    Idempotent initialization calls are cached inside the container lifecycle.
     """
     COLLECTION_NAME = "drishti_evidence_events"
+    VECTOR_DIMENSION = int(os.environ.get("EMBEDDING_DIMENSION", 768)) # Default to 768 for Gemini
     
-    # We will assume a standard 384-dimensional dense vector for lightweight 
-    # open-source text embeddings (like sentence-transformers/all-MiniLM-L6-v2).
-    # If utilizing Gemini's text-embedding-004, this dimension will be 768.
-    VECTOR_DIMENSION = int(os.environ.get("EMBEDDING_DIMENSION", 384))
+    # Class-level state cache to eliminate duplicate sequential collection lookups
+    _collection_checked = False
 
     def __init__(self):
         self.client = QdrantClient(
@@ -34,16 +31,20 @@ class QdrantVectorStore:
 
     def init_collection(self) -> bool:
         """
-        Idempotently initializes the collection with correct indexing configurations.
-        Uses cosine distance for semantic relevance optimization.
+        Idempotently initializes the collection.
+        Uses cached class-level state validation to avoid duplicate API calls.
         """
+        # If checked once in this container lifecycle, return immediately (saves sequential round-trip)
+        if QdrantVectorStore._collection_checked:
+            return True
+
         try:
-            # Check if collection already exists
             collections_response = self.client.get_collections()
             exist = any(c.name == self.COLLECTION_NAME for c in collections_response.collections)
             
             if exist:
-                logger.info(f"Qdrant collection '{self.COLLECTION_NAME}' already initialized.")
+                logger.info(f"Qdrant collection '{self.COLLECTION_NAME}' active.")
+                QdrantVectorStore._collection_checked = True
                 return True
 
             logger.info(f"Creating new Qdrant collection: {self.COLLECTION_NAME}")
@@ -55,12 +56,13 @@ class QdrantVectorStore:
                 )
             )
 
-            # Create an payload index on organization_id to speed up tenant-isolated lookups
             self.client.create_payload_index(
                 collection_name=self.COLLECTION_NAME,
                 field_name="organization_id",
                 field_schema=models.PayloadSchemaType.KEYWORD,
             )
+            
+            QdrantVectorStore._collection_checked = True
             return True
             
         except Exception as e:
@@ -70,15 +72,14 @@ class QdrantVectorStore:
     def upsert_event_vector(
         self, 
         event_id: str, 
-        vector: List[float], 
+        vector: list[float], 
         organization_id: str,
-        payload: Dict[str, Any]
+        payload: dict
     ) -> bool:
         """
         Upserts a single timeline event or incident vector payload.
         Enforces payload properties for multi-tenant isolation.
         """
-        # Ensure critical isolation key is embedded inside the payload
         payload["organization_id"] = organization_id
 
         try:
@@ -99,11 +100,11 @@ class QdrantVectorStore:
 
     def search_semantic_events(
         self, 
-        query_vector: List[float], 
+        query_vector: list[float], 
         organization_id: str, 
         limit: int = 5,
-        score_threshold: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        score_threshold: float = None
+    ) -> list[dict]:
         """
         Searches the collection for matching events.
         Strictly applies filter for organization_id to prevent multi-tenant data leaks.
@@ -132,9 +133,6 @@ class QdrantVectorStore:
                 }
                 for hit in results
             ]
-        except UnexpectedResponse as ur:
-            logger.error(f"Unexpected response from Qdrant during search: {ur}")
-            return []
         except Exception as e:
             logger.error(f"Qdrant query execution error: {e}")
             return []
