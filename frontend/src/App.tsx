@@ -6,7 +6,7 @@ import { EvidenceConsole } from './pages/EvidenceConsole';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) return <div className="placeholder">Verifying platform session...</div>;
+  if (isLoading) return <div className="placeholder font-mono text-xs">Verifying platform session...</div>;
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
 };
 
@@ -26,10 +26,16 @@ export const App: React.FC = () => {
               <PrivateRoute>
                 <EvidenceConsole />
               </PrivateRoute>
-            }
-          >
-            <Route path="evidence/:id" element={<EvidenceConsole />} />
-          </Route>
+            } 
+          />
+          <Route 
+            path="/dashboard/evidence/:id" 
+            element={
+              <PrivateRoute>
+                <EvidenceConsole />
+              </PrivateRoute>
+            } 
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
