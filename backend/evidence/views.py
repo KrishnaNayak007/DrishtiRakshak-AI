@@ -1,4 +1,5 @@
 # backend/evidence/views.py
+from httpx import request
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -13,7 +14,8 @@ from detection.tasks import process_evidence_task
 from detection.llm import LLMClient
 from detection.vector_store import QdrantVectorStore  # Corrected Import
 from qdrant_client.models import Filter, FieldCondition, MatchValue
-
+from organizations.models import OrganizationMembership
+from rest_framework.parsers import JSONParser
 
 class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
@@ -66,7 +68,7 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(evidence)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
-    @action(detail=False, methods=["post"], url_path="search")
+    @action(detail=False, methods=["post"], url_path="search", parser_classes=[JSONParser])
     def semantic_search(self, request):
         """
         POST /api/evidence/search/
@@ -83,17 +85,15 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
             )
 
         # Retrieve tenant scope from active authenticated operator session
-        user = request.user
-        organization_id = getattr(user, "organization_id", None)
-        if not organization_id and hasattr(user, "organization"):
-            org = getattr(user, "organization", None)
-            organization_id = getattr(org, "id", None) if org else None
+        
 
-        if not organization_id:
+        membership = OrganizationMembership.objects.filter(user=request.user).first()
+        if not membership:
             return Response(
-                {"detail": "No tenant context mapped to the active session."},
+                {"detail": "No organization membership found for this user."},
                 status=status.HTTP_403_FORBIDDEN
             )
+        organization_id = membership.organization_id
 
         try:
             # 1. Generate text embedding vector using LLMClient (768 dimensions)
@@ -102,13 +102,13 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
 
             # 2. Query Qdrant with tenant isolation logic applied on the underlying client
             qdrant_store = QdrantVectorStore()
-            
+            qdrant_store.init_collection()
             # Dynamically pull the registered collection name from your vector store module
             collection_name = getattr(qdrant_store, "collection_name", None) or getattr(qdrant_store, "COLLECTION_NAME", "drishti_events")
 
-            raw_hits = qdrant_store.client.search(
+            response = qdrant_store.client.query_points(
                 collection_name=collection_name,
-                query_vector=query_vector,
+                query=query_vector,
                 query_filter=Filter(
                     must=[
                         FieldCondition(
@@ -122,7 +122,7 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
 
             # 3. Structure search payload matching frontend serializers
             results = []
-            for hit in raw_hits:
+            for hit in response.points:
                 results.append({
                     "id": hit.id,
                     "score": hit.score,
