@@ -17,6 +17,11 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue
 from organizations.models import OrganizationMembership
 from rest_framework.parsers import JSONParser
 
+import logging
+from django.db import transaction
+
+logger = logging.getLogger(__name__)
+
 class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     """
     Standard CRUD for uploading evidence clips, plus custom actions:
@@ -39,25 +44,40 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
                 {"detail": "This evidence is already locked/processed and cannot be reprocessed."},
                 status=status.HTTP_409_CONFLICT,
             )
+        
+        # Atomically check-and-set PENDING to close the race window (bug #2)
+        with transaction.atomic():
+            evidence = Evidence.objects.select_for_update().get(pk=evidence.pk)
 
         # Prevent duplicate processing tasks if one is already pending or actively executing
-        if evidence.processing_status in [Evidence.ProcessingStatus.PROCESSING, Evidence.ProcessingStatus.PENDING]:
-            return Response(
-                {
-                    "detail": "Processing is already active or queued for this evidence item.",
-                    "status": evidence.processing_status,
-                    "task_id": evidence.task_id
-                },
-                status=status.HTTP_200_OK
-            )
+            if evidence.processing_status in [Evidence.ProcessingStatus.PROCESSING, Evidence.ProcessingStatus.PENDING]:
+                return Response(
+                    {
+                        "detail": "Processing is already active or queued for this evidence item.",
+                        "status": evidence.processing_status,
+                        "task_id": evidence.task_id
+                    },
+                    status=status.HTTP_200_OK
+                )
 
         # Update local model state to PENDING and wipe out past failures
-        evidence.processing_status = Evidence.ProcessingStatus.PENDING
-        evidence.error_message = None
-        evidence.save(update_fields=["processing_status", "error_message"])
+            evidence.processing_status = Evidence.ProcessingStatus.PENDING
+            evidence.error_message = None
+            evidence.save(update_fields=["processing_status", "error_message"])
 
         # Schedule async worker task passing UUID string representation
-        task = process_evidence_task.delay(str(evidence.id))
+        try:
+            task = process_evidence_task.delay(str(evidence.id))
+        except Exception as exc:
+            # Compensating action: never leave PENDING with no task_id.
+            logger.exception(f"Failed to dispatch processing task for evidence {evidence.id}")
+            evidence.processing_status = Evidence.ProcessingStatus.FAILED
+            evidence.error_message = f"Failed to schedule processing task: {exc}"
+            evidence.save(update_fields=["processing_status", "error_message"])
+            return Response(
+                {"detail": "Failed to schedule processing task.", "error": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # Save generated task signature identifier
         evidence.task_id = task.id

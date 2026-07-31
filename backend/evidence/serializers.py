@@ -25,9 +25,13 @@ class EvidenceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "vehicle", "video_file", "uploaded_at",
             "sha256_hash", "locked", "locked_at", "processed",
+            "processing_status", "task_id", "error_message",
             "timeline_events", "incident",
         ]
-        read_only_fields = ["id", "uploaded_at", "sha256_hash", "locked", "locked_at", "processed"]
+        read_only_fields = [
+            "id", "uploaded_at", "sha256_hash", "locked", "locked_at", "processed",
+            "processing_status", "task_id", "error_message",
+        ]
 
     def validate_video_file(self, value):
         # 1. Size check using Django settings
