@@ -1,20 +1,51 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #0b0d10;
-  --color-bg-panel: #14171c;
-  --color-bg-panel-raised: #191d24;
-  --color-border: #262b33;
-  --color-text-main: #e6e8eb;
-  --color-text-dim: #8b92a0;
-  --color-text-faint: #565d6b;
+:root {
+  --bg: #f8fafc;
+  --bg-panel: #ffffff;
+  --bg-panel-raised: #f1f5f9;
+  --border: #e2e8f0;
+  --text-main: #0f172a;
+  --text-dim: #475569;
+  --text-faint: #94a3b8;
   
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-sans: "Inter", -apple-system, system-ui, sans-serif;
+  --color-risk-none: #64748b;
+  --color-risk-mid: #f59e0b;
+  --color-risk-high: #ef4444;
+  
+  --shadow-custom: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+html.dark {
+  --bg: #0b0d10;
+  --bg-panel: #14171c;
+  --bg-panel-raised: #191d24;
+  --border: #262b33;
+  --text-main: #e6e8eb;
+  --text-dim: #8b92a0;
+  --text-faint: #565d6b;
   
   --color-risk-none: #3a4150;
   --color-risk-mid: #d9a441;
   --color-risk-high: #d9524a;
   
-  --radius-custom: 6px;
+  --shadow-custom: none;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-panel-raised: var(--bg-panel-raised);
+  --color-border: var(--border);
+  --color-text-main: var(--text-main);
+  --color-text-dim: var(--text-dim);
+  --color-text-faint: var(--text-faint);
+  
+  --color-risk-none: var(--color-risk-none);
+  --color-risk-mid: var(--color-risk-mid);
+  --color-risk-high: var(--color-risk-high);
+  
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Inter", -apple-system, system-ui, sans-serif;
+  --radius-custom: 8px;
 }

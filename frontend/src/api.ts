@@ -112,4 +112,6 @@ export const api = {
     method: "POST",
     body: { query } as any
   }),
+  // ADD THIS LINE:
+  deleteEvidence: (id: string): Promise<any> => request(`/v1/evidence/${id}/`, { method: "DELETE" }),
 };
