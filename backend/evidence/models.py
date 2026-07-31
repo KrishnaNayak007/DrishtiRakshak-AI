@@ -31,6 +31,7 @@ class Evidence(models.Model):
     """
 
     class ProcessingStatus(models.TextChoices):
+        NEW = "NEW", _("New")
         PENDING = 'PENDING', _('Pending')
         PROCESSING = 'PROCESSING', _('Processing')
         COMPLETED = 'COMPLETED', _('Completed')
@@ -50,7 +51,7 @@ class Evidence(models.Model):
     processing_status = models.CharField(
         max_length=20,
         choices=ProcessingStatus.choices,
-        default=ProcessingStatus.PENDING
+        default=ProcessingStatus.NEW
     )
     task_id = models.CharField(max_length=255, null=True, blank=True)
     error_message = models.TextField(null=True, blank=True)
