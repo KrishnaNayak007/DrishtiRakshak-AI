@@ -42,9 +42,9 @@ export const EvidenceRow: React.FC<EvidenceRowProps> = ({ item, isSelected, onSe
             className={`text-xs font-bold truncate font-mono tracking-tight ${
               isSelected ? "text-text-main" : "text-text-dim"
             }`}
-            title={item.vehicle}
+            title={item.vehicle_registration || item.vehicle}
           >
-            {item.vehicle}
+            {item.vehicle_registration || item.vehicle}
           </span>
         </div>
         <span className="text-[9px] text-text-faint font-mono shrink-0 flex items-center gap-1">

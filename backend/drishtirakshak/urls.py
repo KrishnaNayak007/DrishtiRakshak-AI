@@ -12,6 +12,8 @@ from organizations.views import OrganizationViewSet, OrganizationMembershipViewS
 from vehicles.views import VehicleViewSet
 from evidence.views import EvidenceViewSet
 from incidents.views import IncidentViewSet
+from police.views import PoliceDispatchViewSet
+from drishtirakshak.views import RegisterView, GoogleAuthView
 
 router = DefaultRouter()
 router.register("organizations", OrganizationViewSet)
@@ -19,6 +21,7 @@ router.register("memberships", OrganizationMembershipViewSet)
 router.register("vehicles", VehicleViewSet)
 router.register("evidence", EvidenceViewSet)
 router.register("incidents", IncidentViewSet)
+router.register("police/dispatches", PoliceDispatchViewSet, basename="police-dispatch")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,6 +29,8 @@ urlpatterns = [
     # access token. Refresh rotation + blacklist are configured in settings.
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/v1/auth/register/', RegisterView.as_view(), name='register'),
+    path('api/v1/auth/google/', GoogleAuthView.as_view(), name='google_auth'),
     path('api/v1/', include(router.urls)),
 ]
 

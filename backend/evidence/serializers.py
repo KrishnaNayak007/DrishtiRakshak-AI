@@ -19,11 +19,14 @@ class EvidenceSerializer(serializers.ModelSerializer):
 
     timeline_events = TimelineEventSerializer(many=True, read_only=True)
     incident = IncidentSerializer(read_only=True)
+    # `vehicle` is a PK relation and serializes as a bare UUID by default —
+    # the UI needs the human-readable plate without a second round trip.
+    vehicle_registration = serializers.CharField(source="vehicle.registration_number", read_only=True)
 
     class Meta:
         model = Evidence
         fields = [
-            "id", "vehicle", "video_file", "uploaded_at",
+            "id", "vehicle", "vehicle_registration", "video_file", "uploaded_at",
             "sha256_hash", "locked", "locked_at", "processed",
             "processing_status", "task_id", "error_message",
             "timeline_events", "incident",

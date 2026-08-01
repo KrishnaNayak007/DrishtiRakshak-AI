@@ -1,42 +1,65 @@
 import React, { useState, useEffect } from "react";
 import { ShieldAlert, Save, CheckCircle2, Sparkles, UserCheck, Terminal, AlertCircle, FileText } from "lucide-react";
 import { Incident } from "../pages/EvidenceConsole";
+import { api } from "../api";
 
 interface IncidentSummaryCardProps {
   incident: Incident | null;
+  onIncidentUpdated?: (incident: Incident) => void;
 }
 
-export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incident }) => {
+export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incident, onIncidentUpdated }) => {
   const [notes, setNotes] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
     if (incident) {
       setNotes(incident.analyst_notes || "");
     }
+    setSaveState("idle");
   }, [incident]);
 
   if (!incident) {
     return (
       <div className="bg-bg-panel border border-border rounded-xl p-6 flex flex-col items-center justify-center text-center shadow-md backdrop-blur-md">
-        <ShieldAlert className="w-8 h-8 text-text-faint mb-2 animate-bounce" />
-        <p className="text-xs text-text-dim font-mono uppercase tracking-wider">No threat telemetry anomalies classified.</p>
+        <ShieldAlert className="w-8 h-8 text-text-faint mb-2" />
+        <p className="text-xs text-text-dim font-mono uppercase tracking-wider">No incident yet — pipeline hasn't produced a risk assessment for this clip.</p>
       </div>
     );
   }
 
-  const isHighRisk = incident.severity === "HIGH";
+  // risk_score is 0.0-1.0 from the backend's transparent weighted heuristic
+  // (detection/risk.py) - not a 0-100 scale, and not from an LLM.
+  const riskPercent = Math.round(incident.risk_score * 100);
+  const isHighRisk = riskPercent >= 66;
 
-  const handleSaveNotes = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSaveNotes = async () => {
+    setSaveState("saving");
+    try {
+      const updated = await api.updateIncident(incident.id, { analyst_notes: notes });
+      setSaveState("saved");
+      onIncidentUpdated?.(updated);
+      setTimeout(() => setSaveState("idle"), 2000);
+    } catch (err) {
+      console.error("Failed to save analyst notes:", err);
+      setSaveState("error");
+    }
+  };
+
+  const handleStatusChange = async (status: "open" | "reviewed" | "closed") => {
+    try {
+      const updated = await api.updateIncident(incident.id, { status });
+      onIncidentUpdated?.(updated);
+    } catch (err) {
+      console.error("Failed to update incident status:", err);
+    }
   };
 
   // Compute circular stroke offset for the risk gauge
   // Circumference of radius 18 is 2 * pi * 18 = 113.1
   const radius = 18;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (incident.risk_score / 100) * circumference;
+  const strokeDashoffset = circumference - (riskPercent / 100) * circumference;
 
   return (
     <div className="bg-bg-panel border border-border rounded-xl overflow-hidden relative font-sans shadow-lg transition-colors duration-150 backdrop-blur-md">
@@ -49,20 +72,24 @@ export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incide
         <div className="flex items-start justify-between border-b border-border pb-3 mb-4">
           <div>
             <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-text-faint uppercase tracking-wider">
-              <Sparkles size={11} className="text-emerald-400 animate-pulse" />
-              <span>AI Threat Profile Ingestion</span>
+              <Terminal size={11} className="text-emerald-400" />
+              <span>Risk Assessment (rule-based heuristic)</span>
             </div>
-            <p className="text-sm font-bold text-text-main mt-1 flex items-center gap-1.5">
-              <span>{incident.threat_category}</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="System verified" />
-            </p>
           </div>
           
           <div className="text-right">
-            <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider">SEVERITY VALUE</span>
-            <div className={`text-xs font-black font-mono tracking-wider ${isHighRisk ? "text-rose-500" : "text-amber-500"}`}>
-              {incident.severity}
-            </div>
+            <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider">REVIEW STATUS</span>
+            <select
+              value={incident.status}
+              onChange={(e) => handleStatusChange(e.target.value as "open" | "reviewed" | "closed")}
+              className={`block text-xs font-black font-mono tracking-wider bg-transparent border-none cursor-pointer ${
+                incident.status === "closed" ? "text-emerald-500" : incident.status === "reviewed" ? "text-blue-400" : "text-amber-500"
+              }`}
+            >
+              <option value="open">OPEN</option>
+              <option value="reviewed">REVIEWED</option>
+              <option value="closed">CLOSED</option>
+            </select>
           </div>
         </div>
 
@@ -92,13 +119,13 @@ export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incide
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
-                <span className="text-xs font-black text-text-main leading-none">{incident.risk_score}</span>
-                <span className="text-[7px] text-text-faint uppercase">Index</span>
+                <span className="text-xs font-black text-text-main leading-none">{riskPercent}%</span>
+                <span className="text-[7px] text-text-faint uppercase">Risk</span>
               </div>
             </div>
             <div>
-              <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider">Risk Coefficient</span>
-              <p className="text-[10px] text-text-dim leading-relaxed font-sans mt-0.5">Assessed threat score out of 100 points.</p>
+              <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider">Risk Score</span>
+              <p className="text-[10px] text-text-dim leading-relaxed font-sans mt-0.5">Weighted sum of flagged events (see below), not a black-box AI score.</p>
             </div>
           </div>
 
@@ -122,17 +149,31 @@ export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incide
             </span>
             <button
               onClick={handleSaveNotes}
-              className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm"
+              disabled={saveState === "saving"}
+              className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm disabled:opacity-50"
             >
-              {saved ? (
+              {saveState === "saving" && (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />
-                  <span className="text-emerald-400">Notes Updated</span>
+                  <Save className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Saving...</span>
                 </>
-              ) : (
+              )}
+              {saveState === "saved" && (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Saved</span>
+                </>
+              )}
+              {saveState === "error" && (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="text-rose-400">Save failed - retry</span>
+                </>
+              )}
+              {saveState === "idle" && (
                 <>
                   <Save className="w-3.5 h-3.5" />
-                  <span>Commit Notes</span>
+                  <span>Save Notes</span>
                 </>
               )}
             </button>

@@ -35,6 +35,18 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsTenantMember]
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        membership = OrganizationMembership.objects.filter(user=user).first()
+        if not membership:
+            from drishtirakshak.views import provision_user_tenant
+            org, membership, vehicle = provision_user_tenant(user, "MH-12-GQ-9831")
+        else:
+            vehicle = Vehicle.objects.filter(organization=membership.organization).first()
+            if not vehicle:
+                vehicle = Vehicle.objects.create(organization=membership.organization, license_plate="MH-12-GQ-9831")
+        serializer.save(vehicle=vehicle)
+
     @action(detail=True, methods=["post"])
     def process(self, request, pk=None):
         evidence = self.get_object()  # Multi-tenant scoping automatically verified here

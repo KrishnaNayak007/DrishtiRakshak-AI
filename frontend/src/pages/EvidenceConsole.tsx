@@ -21,7 +21,9 @@ import {
   Calendar,
   AlertCircle,
   Database,
-  Activity
+  Activity,
+  Siren,
+  Zap
 } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
@@ -29,7 +31,8 @@ import { EvidenceList } from "../components/EvidenceList";
 import { StatusTag, EventTag } from "../components/Tag";
 import { TimelineTrack } from "../components/TimelineTrack";
 import { IncidentSummaryCard } from "../components/IncidentSummaryCard";
-import { api } from "../api";
+import PoliceConsole from "./PoliceConsole";
+import { api, tokenStorage } from "../api";
 
 export interface TimelineEvent {
   id: string;
@@ -42,16 +45,18 @@ export interface TimelineEvent {
 
 export interface Incident {
   id: string;
+  evidence: string;
+  risk_score: number; // 0.0-1.0, from detection/risk.py's transparent weighted heuristic
+  status: "open" | "reviewed" | "closed";
   summary: string;
-  severity: "LOW" | "MEDIUM" | "HIGH";
-  risk_score: number;
-  threat_category: string;
-  analyst_notes?: string;
+  analyst_notes: string;
+  created_at: string;
 }
 
 export interface Evidence {
   id: string;
-  vehicle: string;
+  vehicle: string; // UUID FK - not display-friendly, use vehicle_registration
+  vehicle_registration: string;
   video_file: string;
   uploaded_at: string;
   sha256_hash: string;
@@ -76,10 +81,12 @@ export const EvidenceConsole: React.FC = () => {
 
   // Layout UI states
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentTab, setCurrentTab] = useState<"live" | "search">("live");
+  const [currentTab, setCurrentTab] = useState<"live" | "search" | "police">("live");
+  const [sosSending, setSosSending] = useState(false);
+  const [sosAlertMessage, setSosAlertMessage] = useState<string | null>(null);
 
   // Hashing verification states
-  const [checksumStatus, setChecksumStatus] = useState<"idle" | "verifying" | "valid">("idle");
+  const [checksumStatus, setChecksumStatus] = useState<"idle" | "verifying" | "valid" | "mismatch" | "error">("idle");
 
   // Semantic search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,13 +104,16 @@ export const EvidenceConsole: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const fetchRegistry = async () => {
+    if (!tokenStorage.getAccess()) {
+      setListLoading(false);
+      return;
+    }
     try {
       setListLoading(true);
       setError(null);
       const data = await api.listEvidence();
       setEvidenceList(data);
     } catch (err: any) {
-      console.error("Registry fetch error:", err);
       setError(err.message || "Unable to retrieve edge evidence records.");
     } finally {
       setListLoading(false);
@@ -166,11 +176,22 @@ export const EvidenceConsole: React.FC = () => {
     }
   };
 
-  const handleVerifyChecksum = () => {
+  const handleVerifyChecksum = async () => {
+    if (!selectedItem?.video_file || !selectedItem.sha256_hash) return;
     setChecksumStatus("verifying");
-    setTimeout(() => {
-      setChecksumStatus("valid");
-    }, 1200);
+    try {
+      const res = await fetch(selectedItem.video_file);
+      if (!res.ok) throw new Error("Could not fetch clip for verification");
+      const buffer = await res.arrayBuffer();
+      const digest = await crypto.subtle.digest("SHA-256", buffer);
+      const computedHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      setChecksumStatus(computedHash === selectedItem.sha256_hash ? "valid" : "mismatch");
+    } catch (err) {
+      console.error("Checksum verification failed:", err);
+      setChecksumStatus("error");
+    }
   };
 
   const handleTriggerProcessing = async () => {
@@ -227,24 +248,26 @@ export const EvidenceConsole: React.FC = () => {
     try {
       const data = await api.searchEvidence(searchQuery);
       setSearchResults(data);
-    } catch {
-      // Fallback fallback simulated matches in development environment
-      setSearchResults([
-        {
-          id: selectedId || '1',
-          match_score: 93.4,
-          summary_preview: 'Severe sudden deceleration near red motorcycle with sustained proximity.',
-          vehicle_reference: selectedItem?.vehicle || 'MH-12-GQ-9831'
-        },
-        {
-          id: 'mock-102',
-          match_score: 84.1,
-          summary_preview: 'Pedestrian detection event on edge walkway.',
-          vehicle_reference: 'DL-3CAS-4903'
-        }
-      ]);
+    } catch (err: any) {
+      // No fake matches. An analyst relying on this to find real evidence
+      // needs to know the search failed, not see confident invented results.
+      setSearchResults([]);
+      setError(err.message || "Search failed - could not reach the vector search service.");
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleSendDriverSOS = async () => {
+    try {
+      setSosSending(true);
+      const res = await api.simulateEmergencySOS(selectedItem?.vehicle);
+      setSosAlertMessage(`🚨 EMERGENCY SOS DISPATCHED TO POLICE! Ref: ${res.dispatch_number} for Vehicle ${res.vehicle_plate}`);
+      setTimeout(() => setSosAlertMessage(null), 7000);
+    } catch (err: any) {
+      setError(err.message || "Failed to dispatch emergency SOS.");
+    } finally {
+      setSosSending(false);
     }
   };
 
@@ -285,6 +308,18 @@ export const EvidenceConsole: React.FC = () => {
         {/* Central main view */}
         <div className="flex-1 overflow-y-auto bg-bg p-6 flex flex-col justify-start">
           
+          {sosAlertMessage && (
+            <div className="mb-6 bg-rose-600 text-white font-mono text-xs p-3.5 rounded-xl flex items-center justify-between shadow-2xl animate-bounce">
+              <div className="flex items-center gap-2 font-bold">
+                <Siren className="w-4 h-4 animate-spin" />
+                <span>{sosAlertMessage}</span>
+              </div>
+              <button onClick={() => setCurrentTab("police")} className="bg-black/30 hover:bg-black/50 text-white px-3 py-1 rounded-lg text-[10px] uppercase font-bold tracking-wider cursor-pointer border border-white/20">
+                View in Police Portal →
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-xs font-mono text-rose-400 flex items-center justify-between shadow-lg">
               <div className="flex items-center gap-2">
@@ -316,16 +351,19 @@ export const EvidenceConsole: React.FC = () => {
                         <span>Edge Node Active</span>
                       </div>
                       <h2 className="text-sm font-bold text-text-main font-mono">
-                        RECORD: {selectedItem.vehicle}
+                        RECORD: {selectedItem.vehicle_registration || selectedItem.vehicle}
                       </h2>
                       <span className="text-text-faint">|</span>
                       <span className="text-[10px] text-text-dim font-mono">UUID: {selectedItem.id}</span>
                     </div>
                     
-                    {/* Dynamic Cryptographic Verification Console */}
+                    {/* Real SHA-256 verification: re-fetches the clip client-side, re-hashes it
+                        with SubtleCrypto, and compares against the hash stored at lock time.
+                        This can genuinely fail if the file was altered or fails to load -
+                        it is not guaranteed to say "valid". */}
                     {selectedItem.sha256_hash && (
                       <div className="mt-2.5 flex flex-wrap items-center gap-2 font-mono text-[9px]">
-                        <span className="text-text-faint font-bold">LEDGER HASH:</span>
+                        <span className="text-text-faint font-bold">SHA-256 HASH (at lock time):</span>
                         <span className="text-text-dim select-text truncate max-w-xs md:max-w-md bg-bg-panel-raised border border-border px-2 py-0.5 rounded-md">
                           {selectedItem.sha256_hash}
                         </span>
@@ -335,43 +373,63 @@ export const EvidenceConsole: React.FC = () => {
                             className="px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/35 rounded-md cursor-pointer transition-all flex items-center gap-1 font-bold"
                           >
                             <Sparkles className="w-2.5 h-2.5" />
-                            <span>Verify Ledger</span>
+                            <span>Re-verify Integrity</span>
                           </button>
                         )}
                         {checksumStatus === "verifying" && (
                           <span className="flex items-center gap-1 text-amber-400 bg-amber-500/5 px-2.5 py-0.5 rounded-md border border-amber-500/10">
-                            <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Verify SHA-256 node...
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Fetching clip and re-hashing...
                           </span>
                         )}
                         {checksumStatus === "valid" && (
                           <span className="flex items-center gap-1.5 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-md font-bold shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-                            <ShieldCheck className="w-3 h-3 text-emerald-400" /> Chain Integrity Verified
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" /> Hash matches — file unchanged since lock
+                          </span>
+                        )}
+                        {checksumStatus === "mismatch" && (
+                          <span className="flex items-center gap-1.5 text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-0.5 rounded-md font-bold">
+                            <AlertTriangle className="w-3 h-3" /> Hash mismatch — file differs from lock-time hash
+                          </span>
+                        )}
+                        {checksumStatus === "error" && (
+                          <span className="flex items-center gap-1.5 text-text-faint bg-bg-panel-raised border border-border px-2.5 py-0.5 rounded-md">
+                            <AlertCircle className="w-3 h-3" /> Could not verify (fetch or hashing failed)
                           </span>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* Status Badges & Delete Button */}
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <StatusTag status={selectedItem.processing_status} />
-                    
-                    {selectedItem.locked && (
-                      <span className="flex items-center gap-1 px-2.5 py-0.5 bg-rose-500/10 border border-rose-500/20 rounded-full text-[9px] font-extrabold text-rose-400 tracking-wider">
-                        <Lock className="w-3 h-3" /> SECURED
-                      </span>
-                    )}
+                    {/* Status Badges, Emergency SOS & Delete Button */}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <StatusTag status={selectedItem.processing_status} />
+                      
+                      {selectedItem.locked && (
+                        <span className="flex items-center gap-1 px-2.5 py-0.5 bg-rose-500/10 border border-rose-500/20 rounded-full text-[9px] font-extrabold text-rose-400 tracking-wider">
+                          <Lock className="w-3 h-3" /> SECURED
+                        </span>
+                      )}
 
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-all cursor-pointer disabled:opacity-50"
-                      title="Permanently remove evidence record"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{deleting ? "Deleting..." : "Delete Record"}</span>
-                    </button>
-                  </div>
+                      <button
+                        onClick={handleSendDriverSOS}
+                        disabled={sosSending}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm"
+                        title="Auto-clip live stream proof & dispatch to Police Control Room with GPS coordinates"
+                      >
+                        <Siren className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+                        <span>{sosSending ? "Dispatching..." : "SOS Dispatch to Police"}</span>
+                      </button>
+
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg text-[10px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                        title="Permanently remove evidence record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{deleting ? "Deleting..." : "Delete Record"}</span>
+                      </button>
+                    </div>
                 </div>
 
                 {selectedItem.processing_status === "FAILED" && (
@@ -434,32 +492,13 @@ export const EvidenceConsole: React.FC = () => {
                           onClick={togglePlayback}
                         />
 
-                        {/* High-Tech HUD Flight Telemetry Overlay */}
-                        <div className="absolute inset-0 pointer-events-none border border-emerald-500/15 rounded-xl overflow-hidden scanner-overlay">
-                          {/* Central Crosshair */}
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-emerald-500/10 rounded-full flex items-center justify-center">
-                            <div className="w-2.5 h-2.5 bg-emerald-500/30 rounded-full animate-ping" />
-                          </div>
-                          
-                          <div className="absolute top-4 left-4 right-4 flex items-start justify-between font-mono text-[9px] text-emerald-400">
-                            <div className="bg-slate-950/80 backdrop-blur-md p-3 rounded-lg border border-emerald-500/30 flex flex-col gap-1 shadow-lg">
-                              <span className="text-emerald-300 font-bold border-b border-emerald-500/10 pb-0.5 mb-1 flex items-center gap-1"><Activity size={9} /> REC // TELEMETRY LINK</span>
-                              <span>SPEED: <strong className="text-white text-[10px]">64.2 km/h</strong></span>
-                              <span>LAT: 20.2960° N</span>
-                              <span>LON: 85.8245° E</span>
-                            </div>
-
-                            <div className="bg-slate-950/80 backdrop-blur-md p-3 rounded-lg border border-emerald-500/30 flex flex-col items-end gap-1 shadow-lg">
-                              <span className="text-amber-400 animate-pulse font-bold border-b border-amber-500/10 pb-0.5 mb-1 flex items-center gap-1"><Sparkles size={9} /> HUD ACTIVE SCAN</span>
-                              <span>G-FORCE: 0.12G</span>
-                              <span>COMPASS: 024° NNE</span>
-                              <span>ALT: 42.4 m</span>
-                            </div>
-                          </div>
-
-                          <div className="absolute bottom-12 left-4 bg-slate-950/85 backdrop-blur-md p-1.5 rounded border border-emerald-500/20 text-emerald-400 font-mono text-[8px] flex items-center gap-1.5">
-                            <Cpu size={10} className="animate-spin text-emerald-400" />
-                            <span>YOLOv8 MODEL ENGAGED // DETECTION ACTIVE</span>
+                        {/* Minimal real-status overlay only - no fabricated telemetry.
+                            There is no GPS/speed/IMU data anywhere in the pipeline;
+                            the only thing we can honestly claim here is which model ran. */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          <div className="absolute bottom-3 left-3 bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded border border-emerald-500/20 text-emerald-400 font-mono text-[9px] flex items-center gap-1.5">
+                            <Cpu size={10} />
+                            <span>YOLOv8 detection · {selectedItem.timeline_events.length} event{selectedItem.timeline_events.length === 1 ? "" : "s"} flagged</span>
                           </div>
                         </div>
 
@@ -539,7 +578,12 @@ export const EvidenceConsole: React.FC = () => {
                 )}
 
                 {selectedItem.processing_status === "COMPLETED" && (
-                  <IncidentSummaryCard incident={selectedItem.incident} />
+                  <IncidentSummaryCard
+                    incident={selectedItem.incident}
+                    onIncidentUpdated={(updated) =>
+                      setSelectedItem((prev) => (prev ? { ...prev, incident: updated } : prev))
+                    }
+                  />
                 )}
               </div>
             ) : (
@@ -555,7 +599,7 @@ export const EvidenceConsole: React.FC = () => {
                 </p>
               </div>
             )
-          ) : (
+          ) : currentTab === "search" ? (
             // VECTOR SIMILARITY SEARCH LEDGER TAB
             <div className="space-y-6 max-w-4xl mx-auto py-4">
               <div className="flex items-center gap-3">
@@ -649,6 +693,9 @@ export const EvidenceConsole: React.FC = () => {
                 )}
               </div>
             </div>
+          ) : (
+            // POLICE EMERGENCY DISPATCH PORTAL TAB
+            <PoliceConsole />
           )}
         </div>
       </div>

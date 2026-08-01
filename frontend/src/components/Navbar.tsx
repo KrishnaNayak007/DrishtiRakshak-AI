@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { 
   Shield, 
   Activity, 
   Database, 
   Clock, 
   User, 
-  ChevronRight, 
+  ChevronRight,
+  ChevronDown,
   Sun, 
   Moon, 
   Menu,
@@ -13,12 +16,15 @@ import {
   PanelLeft,
   Sparkles,
   Search,
-  Tv
+  Tv,
+  Settings as SettingsIcon,
+  LogOut,
+  Siren
 } from "lucide-react";
 
 interface NavbarProps {
-  currentTab?: "live" | "search";
-  onTabChange?: (tab: "live" | "search") => void;
+  currentTab?: "live" | "search" | "police";
+  onTabChange?: (tab: "live" | "search" | "police") => void;
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
 }
@@ -29,20 +35,40 @@ export const Navbar: React.FC<NavbarProps> = ({
   sidebarOpen = true,
   onToggleSidebar
 }) => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [systemTime, setSystemTime] = useState(new Date().toISOString());
   const [theme, setTheme] = useState<"light" | "dark">(
-    (localStorage.getItem("dr_theme") as "light" | "dark") || "light"
+    (localStorage.getItem("dr_theme") as "light" | "dark") || "dark"
   );
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    logout();
+    navigate("/auth");
+  };
 
   // Synchronize theme with document root class
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
+    if (theme === "light") {
       root.classList.add("light");
       root.classList.remove("dark");
+    } else {
+      root.classList.add("dark");
+      root.classList.remove("light");
     }
     localStorage.setItem("dr_theme", theme);
   }, [theme]);
@@ -116,6 +142,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden xs:inline">Vector Search Ledger</span>
               <span className="bg-cyan-500/20 text-cyan-400 dark:bg-cyan-950/40 text-[8px] font-mono font-bold px-1 rounded-sm border border-cyan-400/20 animate-pulse ml-0.5">AI</span>
             </button>
+
+            {/* Police Dispatch Hub option ONLY for Police role */}
+            {user?.role === "POLICE" && (
+              <button
+                onClick={() => onTabChange("police")}
+                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  currentTab === "police"
+                    ? "bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-sm"
+                    : "text-text-dim hover:text-text-main"
+                }`}
+              >
+                <Siren size={13} className={currentTab === "police" ? "animate-spin" : "text-rose-400"} />
+                <span className="hidden xs:inline">Police Dispatch Hub</span>
+                <span className="bg-rose-500/20 text-rose-400 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full border border-rose-400/30 animate-pulse ml-0.5">SOS</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -152,9 +194,75 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="h-4 w-px bg-border" />
 
-        <div className="flex items-center gap-2 text-text-main font-bold">
-          <User className="w-3.5 h-3.5 text-text-dim" />
-          <span className="hidden xs:inline">admin@drishti</span>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center gap-2 text-text-main font-bold cursor-pointer hover:bg-bg-panel-raised px-2 py-1 rounded-lg transition-colors"
+          >
+            <User className="w-3.5 h-3.5 text-text-dim" />
+            <span className="hidden xs:inline">{user?.username || "admin"}</span>
+            <ChevronDown className={`w-3 h-3 text-text-faint transition-transform ${menuOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-60 bg-bg-panel border border-border rounded-xl shadow-2xl py-1.5 z-50">
+              <div className="px-3.5 py-2.5 border-b border-border space-y-1">
+                <p className="text-xs font-bold text-text-main truncate">{user?.full_name || user?.username || "System Operator"}</p>
+                <p className="text-[10px] text-text-faint truncate">{user?.email || user?.organization}</p>
+                <div className="pt-1 flex items-center gap-1">
+                  <span className={`text-[9px] font-mono font-extrabold px-2 py-0.5 rounded-full border ${
+                    user?.role === "POLICE"
+                      ? "bg-rose-500/15 text-rose-500 border-rose-500/30"
+                      : "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                  }`}>
+                    ROLE: {user?.role || "DRIVER"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Portal Switcher Link ONLY for Police role */}
+              {user?.role === "POLICE" && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    if (onTabChange) {
+                      onTabChange(currentTab === "police" ? "live" : "police");
+                    } else {
+                      navigate(currentTab === "police" ? "/dashboard" : "/police");
+                    }
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-main hover:bg-bg-panel-raised transition-colors cursor-pointer border-b border-border/50 font-semibold"
+                >
+                  {currentTab === "police" ? (
+                    <>
+                      <Tv className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Switch to Driver HUD</span>
+                    </>
+                  ) : (
+                    <>
+                      <Siren className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                      <span>Police Control Room Portal</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button
+                onClick={() => { setMenuOpen(false); navigate("/dashboard/settings"); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-dim hover:text-text-main hover:bg-bg-panel-raised transition-colors cursor-pointer"
+              >
+                <SettingsIcon className="w-3.5 h-3.5" />
+                <span>Settings</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer font-semibold"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>

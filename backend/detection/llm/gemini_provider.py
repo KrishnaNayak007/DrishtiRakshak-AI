@@ -14,22 +14,8 @@ class GeminiProvider(BaseLLMProvider):
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
         
-        # Read environment or default to gemini-3.5-flash
-        model_env = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
-        
-        # Maps retired/legacy models that are restricted for new API projects
-        legacy_models = {
-            "gemini-1.5-flash",
-            "gemini-2.0-flash",
-            "gemini-2.5-flash"
-        }
-        
-        # Self-healing interceptor to dynamically upgrade any legacy models
-        if model_env in legacy_models:
-            logger.info(f"Legacy model '{model_env}' detected in environment. Dynamically upgrading to 'gemini-3.5-flash'.")
-            self.model = "gemini-3.5-flash"
-        else:
-            self.model = model_env
+        model_env = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+        self.model = model_env
             
         self.embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-004")
         

@@ -1,37 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
   --bg: #090b0f; /* Pitch dark sleek background */
-  --bg-panel: rgba(20, 24, 33, 0.7); /* Glassy panel background */
-  --bg-panel-raised: rgba(30, 37, 50, 0.85);
-  --border: rgba(43, 55, 75, 0.5); /* Semi-transparent border */
-  --text-main: #f1f5f9;
+  --bg-panel: rgba(18, 22, 31, 0.85); /* Glassy panel background */
+  --bg-panel-raised: rgba(26, 32, 44, 0.9);
+  --border: rgba(43, 55, 75, 0.6); /* Semi-transparent border */
+  --text-main: #f8fafc;
   --text-dim: #94a3b8;
-  --text-faint: #475569;
+  --text-faint: #64748b;
   
-  --color-risk-none: #38bdf8; /* Vibrant cyan */
-  --color-risk-mid: #f59e0b; /* Amber */
-  --color-risk-high: #f43f5e; /* Rose/Red */
+  --risk-none: #38bdf8; /* Vibrant cyan */
+  --risk-mid: #f59e0b; /* Amber */
+  --risk-high: #f43f5e; /* Rose/Red */
   
-  --shadow-custom: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-custom: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
   --glow-green: 0 0 15px rgba(16, 185, 129, 0.3);
   --glow-blue: 0 0 15px rgba(59, 130, 246, 0.3);
 }
 
 html.light {
-  --bg: #f8fafc;
-  --bg-panel: rgba(255, 255, 255, 0.8);
-  --bg-panel-raised: rgba(241, 245, 249, 0.9);
-  --border: rgba(226, 232, 240, 0.8);
-  --text-main: #0f172a;
-  --text-dim: #475569;
-  --text-faint: #94a3b8;
+  --bg: #eef2ff;
+  --bg-panel: #ffffff;
+  --bg-panel-raised: #f8fafc;
+  --border: #e2e8f0;
+  --text-main: #020617;
+  --text-dim: #334155;
+  --text-faint: #64748b;
   
-  --color-risk-none: #0284c7;
-  --color-risk-mid: #d97706;
-  --color-risk-high: #dc2626;
+  --risk-none: #0284c7;
+  --risk-mid: #d97706;
+  --risk-high: #dc2626;
   
-  --shadow-custom: 0 8px 32px 0 rgba(148, 163, 184, 0.15);
+  --shadow-custom: 0 4px 25px 0 rgba(99, 102, 241, 0.12);
   --glow-green: 0 0 10px rgba(16, 185, 129, 0.15);
   --glow-blue: 0 0 10px rgba(59, 130, 246, 0.15);
 }
@@ -45,13 +46,13 @@ html.light {
   --color-text-dim: var(--text-dim);
   --color-text-faint: var(--text-faint);
   
-  --color-risk-none: var(--color-risk-none);
-  --color-risk-mid: var(--color-risk-mid);
-  --color-risk-high: var(--color-risk-high);
+  --color-risk-none: var(--risk-none);
+  --color-risk-mid: var(--risk-mid);
+  --color-risk-high: var(--risk-high);
   
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-sans: "Outfit", "Inter", -apple-system, system-ui, sans-serif;
-  --radius-custom: 12px;
+  --font-sans: "Outfit", -apple-system, system-ui, sans-serif;
+  --radius-custom: 16px;
 }
 
 /* Custom Scrollbars */
@@ -70,23 +71,23 @@ html.light {
   background: var(--text-faint);
 }
 
-/* Glassmorphism helpers */
+/* Glassmorphism & Social App Helpers */
 .glass-panel {
   background: var(--bg-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
 }
 
 .glass-card {
   background: var(--bg-panel-raised);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-custom);
 }
 
-/* Dynamic scanner & HUD HUD grids */
+/* Dynamic scanner & HUD grids */
 @keyframes scanline {
   0% {
     transform: translateY(-100%);
@@ -133,4 +134,56 @@ html.light {
 .radar-sweep {
   animation: radar-spin 10s linear infinite;
   transform-origin: center;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-1deg);
+  }
+}
+
+.animate-float {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 6s ease-in-out infinite;
+}
+
+/* Fix browser autofill background color bleeding inside input fields */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text-main) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--bg-panel-raised) inset !important;
+  box-shadow: 0 0 0px 1000px var(--bg-panel-raised) inset !important;
+  transition: background-color 5000s ease-in-out 0s;
 }

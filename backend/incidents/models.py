@@ -35,6 +35,10 @@ class Incident(models.Model):
         blank=True,
         help_text="Human-readable explanation of which timeline events drove the risk score.",
     )
+    analyst_notes = models.TextField(
+        blank=True, default="",
+        help_text="Free-text remarks entered by a human reviewer. Not AI-generated.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:

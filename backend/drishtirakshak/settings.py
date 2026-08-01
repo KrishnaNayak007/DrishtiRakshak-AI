@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'evidence',
     'incidents',
     'detection',
+    'police',
 ]
 
 MIDDLEWARE = [
@@ -81,6 +82,7 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 
 ROOT_URLCONF = 'drishtirakshak.urls'
 
