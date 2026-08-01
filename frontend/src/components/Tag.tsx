@@ -8,38 +8,38 @@ interface StatusTagProps {
 export const StatusTag: React.FC<StatusTagProps> = ({ status }) => {
   const config = {
     NEW: {
-      bg: "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300",
+      bg: "bg-slate-500/5 border-slate-500/20 text-slate-400",
       text: "NEW",
-      icon: <Clock className="w-3 h-3 text-slate-500" />,
+      icon: <Clock className="w-2.5 h-2.5" />,
     },
     PENDING: {
-      bg: "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-300 animate-pulse",
+      bg: "bg-blue-500/5 border-blue-500/20 text-blue-400 animate-pulse",
       text: "QUEUED",
-      icon: <Clock className="w-3 h-3 text-blue-500" />,
+      icon: <Clock className="w-2.5 h-2.5" />,
     },
     PROCESSING: {
-      bg: "bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30 text-amber-700 dark:text-amber-300",
-      text: "PROCESSING",
-      icon: <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />,
+      bg: "bg-amber-500/5 border-amber-500/25 text-amber-400",
+      text: "SCANNING",
+      icon: <Loader2 className="w-2.5 h-2.5 animate-spin text-amber-400" />,
     },
     COMPLETED: {
-      bg: "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-300",
+      bg: "bg-emerald-500/5 border-emerald-500/25 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.08)]",
       text: "PROCESSED",
-      icon: <CheckCircle2 className="w-3 h-3 text-emerald-500" />,
+      icon: <CheckCircle2 className="w-2.5 h-2.5" />,
     },
     FAILED: {
-      bg: "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-300",
+      bg: "bg-rose-500/5 border-rose-500/25 text-rose-400",
       text: "FAILED",
-      icon: <AlertTriangle className="w-3 h-3 text-red-500" />,
+      icon: <AlertTriangle className="w-2.5 h-2.5" />,
     },
   };
 
   const active = config[status] || config.NEW;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold tracking-wider ${active.bg}`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[8px] font-mono font-bold tracking-widest uppercase ${active.bg}`}>
       {active.icon}
-      {active.text}
+      <span>{active.text}</span>
     </span>
   );
 };
@@ -52,39 +52,39 @@ interface EventTagProps {
 export const EventTag: React.FC<EventTagProps> = ({ type, confidence }) => {
   const config = {
     vehicle_detected: {
-      bg: "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-300",
-      label: "Vehicle",
-      icon: <Car className="w-3.5 h-3.5" />,
+      bg: "bg-sky-500/5 border-sky-500/20 text-sky-400",
+      label: "VEHICLE DETECTED",
+      icon: <Car className="w-3 h-3" />,
     },
     person_detected: {
-      bg: "bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/30 text-purple-700 dark:text-purple-300",
-      label: "Pedestrian",
-      icon: <User className="w-3.5 h-3.5" />,
+      bg: "bg-purple-500/5 border-purple-500/20 text-purple-400",
+      label: "PEDESTRIAN",
+      icon: <User className="w-3 h-3" />,
     },
     sustained_proximity: {
-      bg: "bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30 text-amber-700 dark:text-amber-300",
-      label: "Tailgating Alert",
-      icon: <Activity className="w-3.5 h-3.5" />,
+      bg: "bg-amber-500/5 border-amber-500/20 text-amber-400",
+      label: "PROXIMITY WARNING",
+      icon: <Activity className="w-3 h-3" />,
     },
     sudden_deceleration: {
-      bg: "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30 text-red-700 dark:text-red-300",
-      label: "Deceleration Spike",
-      icon: <Gauge className="w-3.5 h-3.5" />,
+      bg: "bg-rose-500/5 border-rose-500/20 text-rose-400",
+      label: "DECELERATION SPIKE",
+      icon: <Gauge className="w-3 h-3" />,
     },
     other: {
-      bg: "bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300",
-      label: "Other Event",
-      icon: <HelpCircle className="w-3.5 h-3.5" />,
+      bg: "bg-slate-500/5 border-slate-500/20 text-slate-400",
+      label: "MISC TELEMETRY",
+      icon: <HelpCircle className="w-3 h-3" />,
     },
   };
 
   const active = config[type] || config.other;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-custom)] border font-mono text-xs font-semibold ${active.bg}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border font-mono text-[9px] font-bold tracking-wider uppercase ${active.bg}`}>
       {active.icon}
       <span>{active.label}</span>
-      <span className="opacity-60 text-[10px]">({(confidence * 100).toFixed(0)}%)</span>
+      <span className="opacity-45 text-[8px] font-normal">({(confidence * 100).toFixed(0)}% MATCH)</span>
     </span>
   );
 };

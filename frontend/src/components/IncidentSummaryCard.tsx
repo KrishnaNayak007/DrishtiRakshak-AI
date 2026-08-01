@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ShieldAlert, Save, CheckCircle } from "lucide-react";
+import { ShieldAlert, Save, CheckCircle2, Sparkles, UserCheck, Terminal, AlertCircle, FileText } from "lucide-react";
 import { Incident } from "../pages/EvidenceConsole";
 
 interface IncidentSummaryCardProps {
@@ -18,9 +18,9 @@ export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incide
 
   if (!incident) {
     return (
-      <div className="bg-bg-panel border border-border rounded-[var(--radius-custom)] p-5 flex flex-col items-center justify-center text-center shadow-xs">
-        <ShieldAlert className="w-6 h-6 text-text-faint mb-2" />
-        <p className="text-xs text-text-dim font-sans">No threat telemetry anomalies classified.</p>
+      <div className="bg-bg-panel border border-border rounded-xl p-6 flex flex-col items-center justify-center text-center shadow-md backdrop-blur-md">
+        <ShieldAlert className="w-8 h-8 text-text-faint mb-2 animate-bounce" />
+        <p className="text-xs text-text-dim font-mono uppercase tracking-wider">No threat telemetry anomalies classified.</p>
       </div>
     );
   }
@@ -32,71 +32,120 @@ export const IncidentSummaryCard: React.FC<IncidentSummaryCardProps> = ({ incide
     setTimeout(() => setSaved(false), 2000);
   };
 
+  // Compute circular stroke offset for the risk gauge
+  // Circumference of radius 18 is 2 * pi * 18 = 113.1
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (incident.risk_score / 100) * circumference;
+
   return (
-    <div className="bg-bg-panel border border-border rounded-[var(--radius-custom)] overflow-hidden relative font-sans shadow-xs transition-colors duration-150">
-      <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${isHighRisk ? "bg-red-500" : "bg-amber-500"}`} />
+    <div className="bg-bg-panel border border-border rounded-xl overflow-hidden relative font-sans shadow-lg transition-colors duration-150 backdrop-blur-md">
+      {/* Decorative vertical alert stripe */}
+      <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${isHighRisk ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]" : "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"}`} />
 
       <div className="p-5 pl-7">
+        
+        {/* Header section with status */}
         <div className="flex items-start justify-between border-b border-border pb-3 mb-4">
           <div>
-            <h3 className="text-xs font-mono font-bold text-text-faint uppercase tracking-wider">
-              AI Forensic Diagnostics Profile
-            </h3>
-            <p className="text-sm font-bold text-text-main mt-1">
-              {incident.threat_category}
+            <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-text-faint uppercase tracking-wider">
+              <Sparkles size={11} className="text-emerald-400 animate-pulse" />
+              <span>AI Threat Profile Ingestion</span>
+            </div>
+            <p className="text-sm font-bold text-text-main mt-1 flex items-center gap-1.5">
+              <span>{incident.threat_category}</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" title="System verified" />
             </p>
           </div>
+          
           <div className="text-right">
-            <span className="text-[9px] font-mono font-bold text-text-faint">SEVERITY</span>
-            <div className={`text-xs font-extrabold font-mono tracking-wider ${isHighRisk ? "text-red-500" : "text-amber-500"}`}>
+            <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider">SEVERITY VALUE</span>
+            <div className={`text-xs font-black font-mono tracking-wider ${isHighRisk ? "text-rose-500" : "text-amber-500"}`}>
               {incident.severity}
             </div>
           </div>
         </div>
 
+        {/* Content grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="border-r border-border pr-4">
-            <span className="text-[9px] font-mono font-bold text-text-faint">RISK COEFFICIENT</span>
-            <p className="text-4xl font-extrabold font-sans mt-1 text-text-main tracking-tight">
-              {incident.risk_score}<span className="text-sm font-medium text-text-faint">/100</span>
-            </p>
+          
+          {/* Circular Risk Progress Dial */}
+          <div className="border-r border-border pr-4 flex items-center gap-4">
+            <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
+              <svg className="w-14 h-14 transform -rotate-90">
+                <circle
+                  cx="28"
+                  cy="28"
+                  r={radius}
+                  className="stroke-border fill-none"
+                  strokeWidth="3.5"
+                />
+                <circle
+                  cx="28"
+                  cy="28"
+                  r={radius}
+                  className={`fill-none transition-all duration-500 ${isHighRisk ? "stroke-rose-500" : "stroke-amber-500"}`}
+                  strokeWidth="3.5"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
+                <span className="text-xs font-black text-text-main leading-none">{incident.risk_score}</span>
+                <span className="text-[7px] text-text-faint uppercase">Index</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider">Risk Coefficient</span>
+              <p className="text-[10px] text-text-dim leading-relaxed font-sans mt-0.5">Assessed threat score out of 100 points.</p>
+            </div>
           </div>
 
-          <div className="col-span-2">
-            <span className="text-[9px] font-mono font-bold text-text-faint">DIAGNOSTIC ANALYSIS</span>
-            <p className="text-xs text-text-dim leading-relaxed mt-1.5">
+          <div className="col-span-2 space-y-1">
+            <span className="text-[9px] font-mono font-bold text-text-faint uppercase tracking-wider flex items-center gap-1">
+              <Terminal size={10} className="text-emerald-500" />
+              <span>Diagnostic Analysis Insights</span>
+            </span>
+            <p className="text-xs text-text-dim leading-relaxed font-mono bg-bg-panel-raised border border-border/60 p-3 rounded-lg">
               {incident.summary}
             </p>
           </div>
         </div>
 
-        {/* Handcrafted editable analyst notebook pane */}
+        {/* Analyst notebook section */}
         <div className="mt-5 border-t border-border pt-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono font-bold text-text-dim">ACTIVE ANALYST REMARKS</span>
+            <span className="text-[9px] font-mono font-bold text-text-dim uppercase tracking-wider flex items-center gap-1">
+              <UserCheck size={12} className="text-emerald-500" />
+              <span>Active Operator Remarks Notebook</span>
+            </span>
             <button
               onClick={handleSaveNotes}
-              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 rounded-sm hover:bg-blue-100 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm"
             >
               {saved ? (
                 <>
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-500">Remarks Verified</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />
+                  <span className="text-emerald-400">Notes Updated</span>
                 </>
               ) : (
                 <>
                   <Save className="w-3.5 h-3.5" />
-                  <span>Update Notes</span>
+                  <span>Commit Notes</span>
                 </>
               )}
             </button>
           </div>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Type context-aware telemetry flags, audit logs, or analyst verifications here..."
-            className="w-full min-h-20 bg-bg-panel-raised border border-border rounded-[var(--radius-custom)] p-3 text-xs text-text-main font-sans placeholder:text-text-faint focus:outline-none focus:border-text-dim transition-colors resize-y leading-relaxed"
-          />
+          <div className="relative">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Record forensic remarks, manual verification flags, or legal notes here..."
+              className="w-full min-h-20 bg-bg-panel-raised border border-border focus:border-emerald-500/60 rounded-xl p-3 text-xs text-text-main font-sans placeholder:text-text-faint focus:outline-none transition-all resize-y leading-relaxed"
+            />
+            <FileText size={12} className="absolute right-3.5 bottom-3.5 text-text-faint pointer-events-none" />
+          </div>
         </div>
       </div>
     </div>
