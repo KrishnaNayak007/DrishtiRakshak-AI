@@ -12,9 +12,9 @@ redis-server --port 6379 --bind 127.0.0.1 --daemonize yes
 echo "Running database migrations..."
 python manage.py migrate --noinput
 
-# Start Celery worker in the background (concurrency=1 to save memory)
+# Start Celery worker in the background (concurrency=1 and solo pool to save memory)
 echo "Starting Celery worker..."
-celery -A drishtirakshak worker --loglevel=info --concurrency=1 &
+celery -A drishtirakshak worker --loglevel=info --concurrency=1 --pool=solo &
 
 # Start Nginx in the background
 echo "Starting Nginx reverse proxy..."

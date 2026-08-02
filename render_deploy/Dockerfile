@@ -44,6 +44,14 @@ ENV SECRET_KEY=django-insecure-render-deployment-secret-key-12345
 ENV ALLOWED_HOSTS=*
 ENV CORS_ALLOWED_ORIGINS=http://localhost:10000,http://127.0.0.1:10000
 
+# Thread optimization to prevent PyTorch CPU memory bloat (accents 512MB RAM free tier limit)
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV VECLIB_MAXIMUM_THREADS=1
+ENV NUMEXPR_NUM_THREADS=1
+ENV TORCH_NUM_THREADS=1
+
 # Run collectstatic and migrate database at build time
 WORKDIR /app/backend
 RUN python manage.py collectstatic --noinput
