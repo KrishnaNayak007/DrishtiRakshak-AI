@@ -21,3 +21,5 @@ redis>=5.0.0
 # AI & Vector Storage Integrations
 google-genai>=0.1.0
 qdrant-client>=1.9.0
+
+gunicorn>=23.0.0
