@@ -187,3 +187,67 @@ input:-webkit-autofill:active {
   box-shadow: 0 0 0px 1000px var(--bg-panel-raised) inset !important;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* Ambient Cyber HUD Styling & Orbs */
+.cyber-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+}
+
+html.light .cyber-grid {
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+}
+
+.glow-orb-indigo {
+  filter: blur(130px);
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 80%);
+}
+
+.glow-orb-emerald {
+  filter: blur(130px);
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 80%);
+}
+
+.hover-glow-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.hover-glow-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.hover-glow-card-indigo {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.hover-glow-card-indigo:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.hover-glow-card-rose {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.hover-glow-card-rose:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(244, 63, 94, 0.20);
+  border-color: rgba(244, 63, 94, 0.4);
+}
+
+.hover-glow-card-amber {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.hover-glow-card-amber:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+}

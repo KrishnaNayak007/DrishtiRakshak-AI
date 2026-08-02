@@ -26,7 +26,7 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string>) };
   
   const token = tokenStorage.getAccess();
-  if (!token && !path.startsWith("/token/") && !path.startsWith("/auth/")) {
+  if (!token && !path.startsWith("/token/") && !path.startsWith("/auth/") && !path.startsWith("/v1/auth/")) {
     return Array.isArray(options.body) || path.endsWith("/") ? [] : null;
   }
 
@@ -75,10 +75,10 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
 
       headers["Authorization"] = `Bearer ${tokens.access}`;
       const retryRes = await fetch(`${API_BASE}${path}`, { ...options, headers, body });
-      if (!retryRes.ok) {
+      if (retryRes.status === 401) {
         tokenStorage.clear();
         window.dispatchEvent(new Event("auth_logout"));
-        return null;
+        throw new Error("Session expired. Please log in again.");
       }
       return retryRes.status === 204 ? null : retryRes.json();
     } catch {
@@ -196,10 +196,10 @@ export const api = {
     }
     return data;
   },
-  googleAuth: async (idToken: string | null, role: string = "DRIVER", vehicleNumber?: string, username?: string): Promise<any> => {
+  googleAuth: async (token: string | null, role: string = "DRIVER", vehicleNumber?: string, username?: string, email?: string): Promise<any> => {
     const data = await request("/v1/auth/google/", {
       method: "POST",
-      body: { id_token: idToken, role, vehicleNumber, username } as any,
+      body: { token, id_token: token, access_token: token, role, vehicleNumber, username, email } as any,
     });
     if (data && data.access) {
       tokenStorage.set(data.access, data.refresh);
@@ -222,7 +222,12 @@ export const api = {
   processEvidence: (id: string): Promise<any> => request(`/v1/evidence/${id}/process/`, { method: "POST" }),
   uploadEvidence: (vehicleId: string, file: File): Promise<any> => {
     const form = new FormData();
-    form.append("vehicle", vehicleId);
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(vehicleId);
+    if (isUuid) {
+      form.append("vehicle", vehicleId);
+    } else {
+      form.append("vehicle_number", vehicleId);
+    }
     form.append("video_file", file);
     return request("/v1/evidence/", { method: "POST", body: form });
   },

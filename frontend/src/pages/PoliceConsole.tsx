@@ -144,7 +144,7 @@ export const PoliceConsole: React.FC = () => {
 
         {/* Counter Summary Widgets */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono">
-          <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl flex items-center justify-between">
+          <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl flex items-center justify-between hover-glow-card-rose">
             <div>
               <span className="text-[10px] text-rose-500 font-bold block uppercase tracking-wider">Active Critical SOS</span>
               <span className="text-2xl font-black text-text-main">{criticalCount}</span>
@@ -152,7 +152,7 @@ export const PoliceConsole: React.FC = () => {
             <Siren className="w-8 h-8 text-rose-500/40 animate-pulse" />
           </div>
 
-          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center justify-between">
+          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center justify-between hover-glow-card-amber">
             <div>
               <span className="text-[10px] text-amber-500 font-bold block uppercase tracking-wider">Patrol Units En-Route</span>
               <span className="text-2xl font-black text-text-main">{dispatchedCount}</span>
@@ -160,7 +160,7 @@ export const PoliceConsole: React.FC = () => {
             <Radio className="w-8 h-8 text-amber-500/40" />
           </div>
 
-          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl flex items-center justify-between">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl flex items-center justify-between hover-glow-card">
             <div>
               <span className="text-[10px] text-emerald-500 font-bold block uppercase tracking-wider">Cases Solved (Verified)</span>
               <span className="text-2xl font-black text-text-main">{solvedCount}</span>
@@ -210,10 +210,10 @@ export const PoliceConsole: React.FC = () => {
                 key={item.id}
                 className={`bg-bg-panel border rounded-2xl p-6 relative overflow-hidden transition-all duration-200 shadow-lg ${
                   item.status === "CRITICAL_SOS" 
-                    ? "border-rose-500/40 bg-rose-500/5" 
+                    ? "border-rose-500/40 bg-rose-500/5 hover-glow-card-rose" 
                     : item.status === "CASE_SOLVED"
-                    ? "border-emerald-500/30 bg-emerald-500/5 opacity-90"
-                    : "border-amber-500/30 bg-amber-500/5"
+                    ? "border-emerald-500/30 bg-emerald-500/5 opacity-90 hover-glow-card"
+                    : "border-amber-500/30 bg-amber-500/5 hover-glow-card-amber"
                 }`}
               >
                 {/* Left accent stripe */}

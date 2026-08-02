@@ -272,8 +272,12 @@ export const EvidenceConsole: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-bg text-text-main font-sans antialiased overflow-hidden select-none transition-colors duration-150">
+    <div className="flex flex-col h-screen bg-bg text-text-main font-sans antialiased overflow-hidden select-none transition-colors duration-150 relative cyber-grid">
       
+      {/* Ambient background glow orbs */}
+      <div className="absolute top-1/4 left-1/3 w-[600px] h-[600px] rounded-full glow-orb-indigo pointer-events-none z-0" />
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full glow-orb-emerald pointer-events-none z-0" />
+
       {/* Navbar wrapper */}
       <Navbar 
         currentTab={currentTab}
@@ -282,7 +286,7 @@ export const EvidenceConsole: React.FC = () => {
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative z-10">
         
         {/* Collapsible Sidebar Wrapper */}
         <div 

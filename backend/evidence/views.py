@@ -9,6 +9,7 @@ from common.permissions import IsTenantMember, TenantScopedQuerySetMixin
 from evidence.models import Evidence
 from evidence.serializers import EvidenceSerializer
 from detection.tasks import process_evidence_task
+from vehicles.models import Vehicle
 
 # Semantic search and multi-tenant vector storage imports
 from detection.llm import LLMClient
@@ -40,12 +41,32 @@ class EvidenceViewSet(TenantScopedQuerySetMixin, viewsets.ModelViewSet):
         membership = OrganizationMembership.objects.filter(user=user).first()
         if not membership:
             from drishtirakshak.views import provision_user_tenant
-            org, membership, vehicle = provision_user_tenant(user, "MH-12-GQ-9831")
+            org, membership, target_vehicle = provision_user_tenant(user, "MH-12-GQ-9831")
         else:
-            vehicle = Vehicle.objects.filter(organization=membership.organization).first()
-            if not vehicle:
-                vehicle = Vehicle.objects.create(organization=membership.organization, license_plate="MH-12-GQ-9831")
-        serializer.save(vehicle=vehicle)
+            org = membership.organization
+            raw_input = self.request.data.get('vehicle') or self.request.data.get('vehicle_id') or self.request.data.get('vehicle_number')
+            target_vehicle = None
+            if raw_input:
+                try:
+                    target_vehicle = Vehicle.objects.filter(id=raw_input, organization=org).first()
+                except Exception:
+                    pass
+                if not target_vehicle:
+                    plate_str = str(raw_input).strip().upper()
+                    target_vehicle = Vehicle.objects.filter(registration_number=plate_str).first()
+                    if not target_vehicle:
+                        target_vehicle, _ = Vehicle.objects.get_or_create(
+                            registration_number=plate_str,
+                            defaults={"organization": org, "vehicle_type": Vehicle.VehicleType.OTHER}
+                        )
+            if not target_vehicle:
+                target_vehicle = Vehicle.objects.filter(organization=org).first()
+                if not target_vehicle:
+                    target_vehicle, _ = Vehicle.objects.get_or_create(
+                        registration_number="MH-12-GQ-9831",
+                        defaults={"organization": org, "vehicle_type": Vehicle.VehicleType.OTHER}
+                    )
+        serializer.save(vehicle=target_vehicle)
 
     @action(detail=True, methods=["post"])
     def process(self, request, pk=None):

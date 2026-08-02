@@ -10,17 +10,12 @@ class TimelineEventSerializer(serializers.ModelSerializer):
         fields = ["id", "timestamp_offset_seconds", "event_type", "confidence", "description", "bounding_boxes"]
 
 
-class EvidenceSerializer(serializers.ModelSerializer):
-    """
-    Nests timeline_events and incident as read-only — a client fetching one
-    Evidence record gets the full picture (clip + detected events + risk
-    score) in one request, which is exactly what a timeline UI needs.
-    """
+from vehicles.models import Vehicle
 
+class EvidenceSerializer(serializers.ModelSerializer):
     timeline_events = TimelineEventSerializer(many=True, read_only=True)
     incident = IncidentSerializer(read_only=True)
-    # `vehicle` is a PK relation and serializes as a bare UUID by default —
-    # the UI needs the human-readable plate without a second round trip.
+    vehicle = serializers.PrimaryKeyRelatedField(queryset=Vehicle.objects.all(), required=False, allow_null=True)
     vehicle_registration = serializers.CharField(source="vehicle.registration_number", read_only=True)
 
     class Meta:

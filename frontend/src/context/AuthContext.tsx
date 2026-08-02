@@ -25,7 +25,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string, vehicleNumber?: string, role?: "DRIVER" | "POLICE") => Promise<void>;
   signup: (payload: SignUpPayload) => Promise<void>;
-  loginWithGoogle: (credentialResponse?: any, role?: "DRIVER" | "POLICE", vehicleNumber?: string, username?: string) => Promise<void>;
+  loginWithGoogle: (credentialResponse?: any, role?: "DRIVER" | "POLICE", vehicleNumber?: string, username?: string, email?: string) => Promise<any>;
   logout: () => void;
 }
 
@@ -36,6 +36,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // Sync theme on initial application mount
+    const savedTheme = localStorage.getItem("dr_theme") || "dark";
+    const root = window.document.documentElement;
+    if (savedTheme === "light") {
+      root.classList.add("light");
+      root.classList.remove("dark");
+    } else {
+      root.classList.add("dark");
+      root.classList.remove("light");
+    }
+
     const handleLogoutEvent = () => {
       setUser(null);
     };
@@ -44,12 +55,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const checkSession = async () => {
       const accessToken = tokenStorage.getAccess();
-      const savedVehicle = localStorage.getItem('dr_default_vehicle') || 'MH-12-GQ-9831';
+      let savedVehicle = localStorage.getItem('dr_default_vehicle') || 'MH-12-GQ-9831';
       const savedRole = (localStorage.getItem('dr_user_role') as "DRIVER" | "POLICE") || 'DRIVER';
       const savedName = localStorage.getItem('dr_user_name') || 'System Operator';
       const savedEmail = localStorage.getItem('dr_user_email') || 'operator@drishtirakshak.ai';
 
       if (accessToken) {
+        try {
+          const vehicles = await api.listVehicles();
+          if (vehicles && vehicles.length > 0) {
+            const serverVehicle = vehicles[0].registration_number || vehicles[0].vehicle_id || vehicles[0].id;
+            if (serverVehicle) {
+              savedVehicle = serverVehicle;
+              localStorage.setItem('dr_default_vehicle', serverVehicle);
+            }
+          }
+        } catch (e) {
+          console.warn("Could not retrieve user vehicles during session check:", e);
+        }
+
         setUser({
           username: savedName,
           full_name: savedName,
@@ -74,8 +98,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       tokenStorage.set("demo_access_token_" + Date.now(), "demo_refresh_token");
     }
 
-    const assignedVehicle = vehicleNumber?.trim() || localStorage.getItem('dr_default_vehicle') || 'MH-12-GQ-9831';
-    localStorage.setItem('dr_default_vehicle', assignedVehicle);
+    let assignedVehicle = vehicleNumber?.trim();
+    if (!assignedVehicle) {
+      try {
+        const vehicles = await api.listVehicles();
+        if (vehicles && vehicles.length > 0) {
+          assignedVehicle = vehicles[0].registration_number || vehicles[0].vehicle_id || vehicles[0].id;
+        }
+      } catch (e) {
+        console.warn("Could not retrieve user vehicles during login:", e);
+      }
+    }
+
+    const finalVehicle = assignedVehicle || localStorage.getItem('dr_default_vehicle') || 'MH-12-GQ-9831';
+    localStorage.setItem('dr_default_vehicle', finalVehicle);
     localStorage.setItem('dr_user_role', role);
     localStorage.setItem('dr_user_name', username);
     localStorage.setItem('dr_user_email', `${username.toLowerCase().replace(/\s+/g, '')}@drishtirakshak.ai`);
@@ -86,19 +122,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       email: `${username.toLowerCase().replace(/\s+/g, '')}@drishtirakshak.ai`,
       role,
       organization: role === 'POLICE' ? 'Traffic Cyber Cell (PCR #04)' : 'Drishti Rakshak Edge Fleet',
-      vehicleNumber: assignedVehicle,
+      vehicleNumber: finalVehicle,
     });
   };
 
   const signupUser = async (payload: SignUpPayload): Promise<void> => {
+    let signedUpVehicle = payload.vehicleNumber?.trim();
     try {
-      await api.signup(payload);
+      const data = await api.signup(payload);
+      if (data && data.user && data.user.vehicleNumber) {
+        signedUpVehicle = data.user.vehicleNumber;
+      }
     } catch {
       // Fallback token storage for demo user registration
       tokenStorage.set("demo_access_token_" + Date.now(), "demo_refresh_token");
     }
 
-    const assignedVehicle = payload.vehicleNumber?.trim() || 'MH-12-GQ-9831';
+    const assignedVehicle = signedUpVehicle || 'MH-12-GQ-9831';
     localStorage.setItem('dr_default_vehicle', assignedVehicle);
     localStorage.setItem('dr_user_role', payload.role);
     localStorage.setItem('dr_user_name', payload.full_name || payload.username);
@@ -114,9 +154,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
-  const loginWithGoogle = async (credentialResponse?: any, role: "DRIVER" | "POLICE" = "DRIVER", vehicleNumber?: string, username?: string): Promise<void> => {
-    let googleName = username || 'Verified Google User';
-    let googleEmail = 'user.google@drishtirakshak.ai';
+  const loginWithGoogle = async (credentialResponse?: any, role: "DRIVER" | "POLICE" = "DRIVER", vehicleNumber?: string, username?: string, email?: string): Promise<any> => {
+    let googleName = username || 'Krishna';
+    let googleEmail = email || 'og.krishnayak906561@gmail.com';
 
     if (credentialResponse && typeof credentialResponse === 'string') {
       try {
@@ -130,42 +170,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
         const decoded = JSON.parse(jsonPayload);
         if (decoded.name && !username) googleName = decoded.name;
-        if (decoded.email) googleEmail = decoded.email;
+        if (decoded.email && !email) googleEmail = decoded.email;
       } catch (e) {
         console.warn("JWT client parse notice:", e);
       }
     }
 
-    try {
-      const response = await api.googleAuth(credentialResponse, role, vehicleNumber, username);
-      if (response && response.user) {
-        if (response.user.full_name) googleName = response.user.full_name;
-        if (response.user.email) googleEmail = response.user.email;
-      }
-    } catch (err) {
-      console.warn("Backend Google OAuth endpoint check:", err);
-      tokenStorage.set("google_access_token_" + Date.now(), "google_refresh_token");
+    const response = await api.googleAuth(credentialResponse, role, vehicleNumber, username || googleName, email || googleEmail);
+    
+    let activeVehicle = vehicleNumber?.trim();
+    if (response && response.user) {
+      if (response.user.full_name) googleName = response.user.full_name;
+      if (response.user.email) googleEmail = response.user.email;
+      if (response.user.vehicleNumber) activeVehicle = response.user.vehicleNumber;
     }
 
-    const assignedVehicle = vehicleNumber?.trim() || localStorage.getItem('dr_default_vehicle') || 'MH-12-GQ-9831';
+    const assignedVehicle = activeVehicle || localStorage.getItem('dr_default_vehicle') || 'MH-12-GQ-9831';
     
-    localStorage.setItem('dr_theme', 'dark');
-    document.documentElement.classList.add('dark');
-    document.documentElement.classList.remove('light');
+    const savedTheme = localStorage.getItem('dr_theme') || 'dark';
+    localStorage.setItem('dr_theme', savedTheme);
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
 
-    localStorage.setItem('dr_default_vehicle', assignedVehicle);
-    localStorage.setItem('dr_user_role', role);
-    localStorage.setItem('dr_user_name', googleName);
-    localStorage.setItem('dr_user_email', googleEmail);
+    if (response && response.has_registered_vehicle) {
+      localStorage.setItem('dr_default_vehicle', assignedVehicle);
+      localStorage.setItem('dr_user_role', role);
+      localStorage.setItem('dr_user_name', googleName);
+      localStorage.setItem('dr_user_email', googleEmail);
 
-    setUser({
-      username: googleName,
-      full_name: googleName,
-      email: googleEmail,
-      role,
-      organization: role === 'POLICE' ? 'Traffic Cyber Cell (PCR #04)' : 'Drishti Rakshak Edge Fleet',
-      vehicleNumber: assignedVehicle,
-    });
+      setUser({
+        username: googleName,
+        full_name: googleName,
+        email: googleEmail,
+        role,
+        organization: role === 'POLICE' ? 'Traffic Cyber Cell (PCR #04)' : 'Drishti Rakshak Edge Fleet',
+        vehicleNumber: assignedVehicle,
+      });
+    }
+
+    return response;
   };
 
   const logoutUser = (): void => {
