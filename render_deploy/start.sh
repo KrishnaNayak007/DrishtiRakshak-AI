@@ -10,7 +10,7 @@ redis-server --port 6379 --bind 127.0.0.1 --daemonize yes
 
 # Run Django database migrations
 echo "Running database migrations..."
-python backend/manage.py migrate --noinput
+python manage.py migrate --noinput
 
 # Start Celery worker in the background (concurrency=1 to save memory)
 echo "Starting Celery worker..."
