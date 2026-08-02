@@ -1,11 +1,13 @@
 FROM python:3.11-slim
 
-# Install system dependencies (Redis, Nginx, curl, supervisor, Node.js)
+# Install system dependencies (Redis, Nginx, curl, supervisor, Node.js, libgl1, libglib2.0-0 for OpenCV)
 RUN apt-get update && apt-get install -y \
     curl \
     redis-server \
     nginx \
     supervisor \
+    libgl1 \
+    libglib2.0-0 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*

@@ -1,11 +1,13 @@
 FROM python:3.11-slim
 
-# Install system dependencies (Redis, Nginx, curl, gettext-base for envsubst)
+# Install system dependencies (Redis, Nginx, curl, gettext-base for envsubst, libgl1, libglib2.0-0 for OpenCV)
 RUN apt-get update && apt-get install -y \
     curl \
     redis-server \
     nginx \
     gettext-base \
+    libgl1 \
+    libglib2.0-0 \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -42,9 +44,10 @@ ENV SECRET_KEY=django-insecure-render-deployment-secret-key-12345
 ENV ALLOWED_HOSTS=*
 ENV CORS_ALLOWED_ORIGINS=http://localhost:10000,http://127.0.0.1:10000
 
-# Run collectstatic at build time
+# Run collectstatic and migrate database at build time
 WORKDIR /app/backend
 RUN python manage.py collectstatic --noinput
+RUN python manage.py migrate --noinput
 
 # Set entrypoint to our startup script
 ENTRYPOINT ["/bin/bash", "/app/render_deploy/start.sh"]
